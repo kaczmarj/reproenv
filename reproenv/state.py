@@ -5,8 +5,6 @@ import json
 import os
 from pathlib import Path
 import typing as ty
-from typing_extensions import Literal
-
 
 import jsonschema
 import yaml
@@ -45,27 +43,6 @@ def _validate_template(template: TemplateType):
     # For now, this is taken care of in Renderer classes, but it would be good to move
     # that behavior here, so we can catch errors early.
     pass
-
-    # Check for `self.install_dependencies()` in instructions if dependencies are not
-    # empty.
-    # TODO: this mess happened while trying to enforce types... how can it be made
-    # cleaner?
-    method: Literal["binaries", "source"]
-    methods: ty.Set[Literal["binaries", "source"]] = {"binaries", "source"}
-    for method in methods:
-        if method in template.keys():
-            if "dependencies" in template[method]:
-                has_deps = any(template[method]["dependencies"].values())
-                if (
-                    has_deps
-                    and "self.install_dependencies()"
-                    not in template[method]["instructions"]
-                ):
-                    raise TemplateError(
-                        "Dependencies are defined but never installed in"
-                        f" 'template.{method}.instructions'."
-                        "\nAdd `{{ self.install_dependencies() }}` to instructions."
-                    )
 
 
 class _TemplateRegistry:

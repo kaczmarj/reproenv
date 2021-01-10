@@ -125,24 +125,6 @@ def test_validate_template_invalid_templates():
             }
         )
 
-    # has dependencies but never installs them.
-    with pytest.raises(exceptions.TemplateError, match="defined but never installed"):
-        _validate_template(
-            {
-                "name": "foobar",
-                "binaries": {
-                    "urls": {"1.0.0": "foobar.com"},
-                    "env": {"foo": "bar"},
-                    "instructions": "foobar",
-                    "arguments": {
-                        "required": [],
-                        "optional": [],
-                    },
-                    "dependencies": {"apt": ["curl"], "dpkg": [], "yum": []},
-                },
-            }
-        )
-
     # defines variable but does not indicate if optional or required
     # TODO
 
@@ -228,23 +210,6 @@ def test_validate_template_invalid_templates():
                 "source": {
                     "instructions": "foobar",
                     "dependencies": {"apt": [], "fakemngr": []},
-                },
-            }
-        )
-
-    # has dependencies but never installs them.
-    with pytest.raises(exceptions.TemplateError, match="defined but never installed"):
-        _validate_template(
-            {
-                "name": "foobar",
-                "source": {
-                    "env": {"foo": "bar"},
-                    "instructions": "foobar",
-                    "arguments": {
-                        "required": [],
-                        "optional": [],
-                    },
-                    "dependencies": {"apt": ["curl"], "dpkg": [], "yum": []},
                 },
             }
         )
