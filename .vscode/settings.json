@@ -1,0 +1,11 @@
+{
+  "editor.tabSize": 4,
+  "editor.rulers": [
+    88
+  ],
+  "python.formatting.provider": "black",
+  "python.linting.pylintEnabled": false,
+  "python.linting.mypyEnabled": true,
+  "python.linting.enabled": true,
+  "python.pythonPath": "./venv/bin/python3"
+}

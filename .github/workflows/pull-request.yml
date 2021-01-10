@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.8', '3.7']
+    steps:
+      - name: Install Singularity
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libssl-dev \
+            uuid-dev \
+            libgpgme11-dev \
+            squashfs-tools
+          curl -fsSL https://github.com/hpcng/singularity/releases/download/v3.6.2/singularity-3.6.2.tar.gz \
+          | tar xz
+          cd singularity
+          ./mconfig
+          cd builddir
+          make -j
+          sudo make install
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install reproenv
+        run: python -m pip install --editable .[dev]
+      - name: Run tests that build Singularity images
+        run: pytest --cov reproenv
+      - name: Code coverage
+        run: codecov

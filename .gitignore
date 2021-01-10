@@ -1,0 +1,17 @@
+/dist
+/build
+/*.egg-info
+__pycache__
+*.pyc
+
+.coverage
+coverage.xml
+.cache
+.pytest_cache
+.mypy_cache
+.DS_Store
+
+.ipynb_checkpoints
+*.ipynb
+
+/venv
