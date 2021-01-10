@@ -191,15 +191,15 @@ class _Renderer:
 
     def render(self) -> str:
         err = (
-            "A template included in this renderer raised an error. Please"
-            " check the template definition. A required argument might not"
-            " be included in the required arguments part of the template."
-            " Variables in the template should start with `self.`."
+            "A template included in this renderer raised an error. Please check the"
+            " template definition. A required argument might not be included in the"
+            " required arguments part of the template. Variables in the template should"
+            " start with `self.`."
         )
         try:
             s = self.jinja_template.render(**self._templates)
-        except jinja2.exceptions.UndefinedError:
-            raise TemplateError(err)
+        except jinja2.exceptions.UndefinedError as e:
+            raise RendererError(err) from e
         if (
             jinja_env.variable_start_string not in s
             and jinja_env.variable_end_string not in s
@@ -211,8 +211,8 @@ class _Renderer:
         # need to be rendered again.
         try:
             return jinja_env.from_string(s).render(**self._templates)
-        except jinja2.exceptions.UndefinedError:
-            raise TemplateError(err)
+        except jinja2.exceptions.UndefinedError as e:
+            raise RendererError(err) from e
 
     def run(self, command: str) -> _Renderer:
         raise NotImplementedError()
