@@ -82,6 +82,7 @@ class _Renderer:
         self._templates[t_id] = template
 
         # Add environment.
+        # TODO: double-check this..
         if template.env:
             d: ty.Mapping[str, str] = {
                 k.replace("self.", t_id_dot): v.replace("self.", t_id_dot)
@@ -96,7 +97,8 @@ class _Renderer:
             if dependencies:
                 run = install(pkgs=dependencies, pkg_manager=self.pkg_manager)
                 run += "\n"
-            run += template.instructions.replace("self.", t_id_dot)
+            # Notice that we use `t_id` and not `t_id_dot` here.
+            run += template.instructions.replace("self.", f"{t_id}.kwds_as_attrs.")
             self.run(run)
 
         return self

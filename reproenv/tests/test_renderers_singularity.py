@@ -43,7 +43,7 @@ apt-get update -qq
 apt-get install -y -q --no-install-recommends \\
     curl wget
 rm -rf /var/lib/apt/lists/*
-echo hello {{ template_0.myname }}"""
+echo hello {{ template_0.kwds_as_attrs.myname }}"""
     )
 
     assert (
@@ -89,7 +89,7 @@ apt-get update -qq
 apt-get install -y -q --no-install-recommends \\
     curl wget
 rm -rf /var/lib/apt/lists/*
-echo hello {{ template_0.myname | default('foo') }}"""
+echo hello {{ template_0.kwds_as_attrs.myname | default('foo') }}"""
     )
 
     assert (

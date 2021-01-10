@@ -60,16 +60,16 @@ def test_docker_renderer_add_template():
     d = {
         "urls": {"1.0.0": "foobar"},
         "env": {"foo": "bar"},
-        "instructions": "echo hello {{ self.myname }}",
+        "instructions": "echo hello {{ self.name }}",
         "name": "foobar",
         "arguments": {
-            "required": ["myname"],
+            "required": ["name"],
             "optional": [],
         },
         "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
     }
     r = DockerRenderer("apt")
-    r.add_template(BinariesTemplate(d, myname="Bjork"))
+    r.add_template(BinariesTemplate(d, name="Bjork"))
     assert (
         str(r)
         == """ENV foo="bar"
@@ -77,7 +77,7 @@ RUN apt-get update -qq \\
     && apt-get install -y -q --no-install-recommends \\
            curl \\
     && rm -rf /var/lib/apt/lists/* \\
-    && echo hello {{ template_0.myname }}"""
+    && echo hello {{ template_0.kwds_as_attrs.name }}"""
     )
     assert (
         r.render()
@@ -92,11 +92,11 @@ RUN apt-get update -qq \\
     d = {
         "urls": {"1.0.0": "foobar"},
         "env": {"foo": "bar"},
-        "instructions": "echo hello {{ self.myname | default('foo') }}",
+        "instructions": "echo hello {{ self.name | default('foo') }}",
         "name": "foobar",
         "arguments": {
             "required": [],
-            "optional": ["myname"],
+            "optional": ["name"],
         },
         "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
     }
@@ -110,7 +110,7 @@ RUN apt-get update -qq \\
     && apt-get install -y -q --no-install-recommends \\
            curl \\
     && rm -rf /var/lib/apt/lists/* \\
-    && echo hello {{ template_0.myname | default('foo') }}"""
+    && echo hello {{ template_0.kwds_as_attrs.name | default('foo') }}"""
     )
     assert (
         r.render()
