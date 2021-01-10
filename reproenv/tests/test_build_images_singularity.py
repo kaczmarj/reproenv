@@ -1,8 +1,10 @@
 import subprocess
 
 from reproenv.renderers import SingularityRenderer
+from reproenv.tests.utils import skip_if_no_singularity
 
 
+@skip_if_no_singularity
 def test_build_a(tmp_path):
     # Create a Singularity recipe.
     d = SingularityRenderer("apt")

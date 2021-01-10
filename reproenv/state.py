@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 import typing as ty
+from typing_extensions import Literal
+
 
 import jsonschema
 import yaml
@@ -47,8 +49,8 @@ def _validate_template(template: TemplateType):
     # empty.
     # TODO: this mess happened while trying to enforce types... how can it be made
     # cleaner?
-    method: ty.Literal["binaries", "source"]
-    methods: ty.Set[ty.Literal["binaries", "source"]] = {"binaries", "source"}
+    method: Literal["binaries", "source"]
+    methods: ty.Set[Literal["binaries", "source"]] = {"binaries", "source"}
     for method in methods:
         if method in template.keys():
             if "dependencies" in template[method]:

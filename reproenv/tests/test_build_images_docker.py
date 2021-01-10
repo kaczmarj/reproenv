@@ -1,11 +1,13 @@
-import docker
-
 from reproenv.renderers import DockerRenderer
+from reproenv.tests.utils import skip_if_no_docker
 
-client = docker.from_env()
 
-
+@skip_if_no_docker
 def test_build_a(tmp_path):
+    import docker
+
+    client = docker.from_env()
+
     # Create a Dockerfile.
     d = DockerRenderer("apt")
     d.from_("debian:buster-slim", as_="builder")
