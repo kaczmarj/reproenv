@@ -18,7 +18,8 @@ try:
 except ImportError:
     from yaml import SafeLoader  # type: ignore
 
-from reproenv.exceptions import TemplateError, TemplateNotFound
+from reproenv.exceptions import TemplateError
+from reproenv.exceptions import TemplateNotFound
 from reproenv.types import TemplateType
 
 _schemas_path = Path(__file__).parent / "schemas"

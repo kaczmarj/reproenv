@@ -24,10 +24,10 @@ from reproenv.exceptions import TemplateError
 from reproenv.state import _TemplateRegistry
 from reproenv.template import BinariesTemplate
 from reproenv.template import SourceTemplate
-from reproenv.types import installation_methods_type
-from reproenv.types import allowed_pkg_managers
-from reproenv.types import pkg_managers_type
 from reproenv.types import _SingularityHeaderType
+from reproenv.types import allowed_pkg_managers
+from reproenv.types import installation_methods_type
+from reproenv.types import pkg_managers_type
 
 # All jinja2 templates are instantiated from this environment object. It is
 # configured to dislike undefined attributes. For example, if a template is

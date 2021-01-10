@@ -46,6 +46,7 @@ class _BaseInstallationTemplate:
                 "Unknown keyword arguments: '{}'.".format("', '".join(unknown_kwargs))
             )
 
+        # TODO: keep user kwargs in a separate dictionary, so names don't clash?
         # Set kwargs as attributes.
         existing_attrs = set(kwargs).intersection(self.__dict__)
         if existing_attrs:
