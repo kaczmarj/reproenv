@@ -32,7 +32,7 @@ class _TemplateArgumentsType(TypedDict):
     optional: ty.List[str]
 
 
-class _BaseTemplateType(TypedDict):
+class _BaseTemplateType(TypedDict, total=False):
     """Keys common to both types of templates: binaries and source."""
 
     arguments: _TemplateArgumentsType
