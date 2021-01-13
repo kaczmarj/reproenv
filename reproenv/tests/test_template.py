@@ -5,6 +5,100 @@ from reproenv import template
 from reproenv import types
 
 
+def test_template():
+    d = {
+        "name": "foobar",
+        "binaries": {
+            "urls": {"v1": "foo"},
+            "env": {"baz": "cat", "boo": "123"},
+            "instructions": "echo hi there\n{{ self.baz }}",
+            "arguments": {"required": ["baz"], "optional": []},
+            "dependencies": {"apt": ["curl"], "dpkg": ["foo"], "yum": ["curl"]},
+        },
+        "source": {
+            "env": {"foo": "bar"},
+            "instructions": "echo foo\n{{ self.boo | default('baz') }}",
+            "arguments": {
+                "required": [],
+                "optional": ["boo"],
+            },
+            "dependencies": {"apt": ["curl"], "dpkg": [], "yum": []},
+        },
+    }
+    # do not provide required kwds
+    with pytest.raises(exceptions.TemplateKeywordArgumentError):
+        template.Template(d)
+    # only provide optional kwd to source
+    with pytest.raises(exceptions.TemplateKeywordArgumentError):
+        template.Template(d, source_kwds=dict(boo="cat"))
+    # provide unknown kwd
+    with pytest.raises(exceptions.TemplateKeywordArgumentError):
+        template.Template(d, source_kwds=dict(boop="cat"))
+    # provide empty dict
+    with pytest.raises(exceptions.TemplateKeywordArgumentError):
+        template.Template(d, binaries_kwds={}, source_kwds=dict(boop="cat"))
+
+    # provide all kwds
+    t = template.Template(d, binaries_kwds=dict(baz=1234), source_kwds=dict(boo="cat"))
+    # do not provide optional kwds
+    t = template.Template(d, binaries_kwds=dict(baz=1234))
+
+    assert t.name == d["name"]
+    assert t.binaries._template == d["binaries"]
+    assert t.source._template == d["source"]
+    assert t._template is not d  # check for deepcopy
+
+    # only contains binaries
+    t = template.Template(
+        {
+            "name": "foobar",
+            "binaries": {
+                "urls": {"v1": "foo"},
+                "env": {"baz": "cat", "boo": "123"},
+                "instructions": "echo hi there\n{{ self.baz }}",
+                "arguments": {"required": ["baz"], "optional": []},
+                "dependencies": {"apt": ["curl"], "dpkg": ["foo"], "yum": ["curl"]},
+            },
+        },
+        binaries_kwds=dict(baz="1234"),
+    )
+    assert t.source is None
+
+    t = template.Template(
+        {
+            "name": "foobar",
+            "source": {
+                "env": {"foo": "bar"},
+                "instructions": "echo foo\n{{ self.boo | default('baz') }}",
+                "arguments": {
+                    "required": [],
+                    "optional": ["boo"],
+                },
+                "dependencies": {"apt": ["curl"], "dpkg": [], "yum": []},
+            },
+        },
+        source_kwds=dict(boo="baz"),
+    )
+    assert t.binaries is None
+
+    # invalid template, but otherwise ok
+    with pytest.raises(exceptions.TemplateError):
+        template.Template(
+            {
+                "source": {
+                    "env": {"foo": "bar"},
+                    "instructions": "echo foo\n{{ self.boo | default('baz') }}",
+                    "arguments": {
+                        "required": [],
+                        "optional": ["boo"],
+                    },
+                    "dependencies": {"apt": ["curl"], "dpkg": [], "yum": []},
+                },
+            },
+            source_kwds=dict(boo="baz"),
+        )
+
+
 def test_installation_template_base():
     d: types.BinariesTemplateType = {
         "urls": {"1.0.0": "foobar"},
