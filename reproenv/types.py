@@ -41,13 +41,13 @@ class _BaseTemplateType(TypedDict, total=False):
     instructions: str
 
 
-class SourceTemplateType(_BaseTemplateType):
+class _SourceTemplateType(_BaseTemplateType):
     """Template that defines how to install software by source."""
 
     pass
 
 
-class BinariesTemplateType(_BaseTemplateType):
+class _BinariesTemplateType(_BaseTemplateType):
     """Template that defines how to install software from pre-compiled binaries."""
 
     urls: ty.Mapping[str, str]
@@ -59,8 +59,8 @@ class TemplateType(TypedDict, total=False):
     """
 
     name: str
-    binaries: BinariesTemplateType
-    source: SourceTemplateType
+    binaries: _BinariesTemplateType
+    source: _SourceTemplateType
 
 
 class _SingularityHeaderType(TypedDict, total=False):
