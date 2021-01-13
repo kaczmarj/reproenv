@@ -49,14 +49,14 @@ def test_installation_template_base():
 
     # versions
     d["arguments"]["required"] += ["version"]
-    it = template.BinariesTemplate(d, name="didi", version="1.0.0", age=42)
-    assert it.kwds_as_attrs.name == "didi"
-    assert it.kwds_as_attrs.version == "1.0.0"
+    it = template._BinariesTemplate(d, name="didi", version="1.0.0", age=42)
+    assert it.name == "didi"
+    assert it.version == "1.0.0"
     # Values are all cast to string.
-    assert it.kwds_as_attrs.age == "42"
+    assert it.age == "42"
     # invalid version - not found in urls
     with pytest.raises(exceptions.TemplateError):
-        template.BinariesTemplate(d, version="2.0.0")
+        template._BinariesTemplate(d, version="2.0.0")
 
     #
     # Source template
@@ -65,7 +65,7 @@ def test_installation_template_base():
         "instructions": "hello {{ self.name }}",
         "arguments": {"required": ["name"], "optional": ["age"]},
     }
-    it = template.SourceTemplate(d, name="foobar")
+    it = template._SourceTemplate(d, name="foobar")
     assert it.versions == {"ANY"}
 
     d: types.SourceTemplateType = {
@@ -77,7 +77,7 @@ def test_installation_template_base():
         },
         "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
     }
-    it = template.SourceTemplate(d, name="foobar", age=42, height=100)
+    it = template._SourceTemplate(d, name="foobar", age=42, height=100)
     assert it._template == d
     assert it.env == {"foo": "bar", "cat": "dog"}
     assert it.instructions == d["instructions"]
@@ -90,6 +90,6 @@ def test_installation_template_base():
     with pytest.raises(ValueError):
         it.dependencies("foobar")
     assert it._kwds == {"name": "foobar", "age": "42", "height": "100"}
-    assert it.kwds_as_attrs.name == "foobar"
-    assert it.kwds_as_attrs.age == "42"
-    assert it.kwds_as_attrs.height == "100"
+    assert it.name == "foobar"
+    assert it.age == "42"
+    assert it.height == "100"

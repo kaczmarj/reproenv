@@ -1,34 +1,41 @@
 import pytest
 
-from reproenv.template import BinariesTemplate
+from reproenv.exceptions import RendererError
 from reproenv.renderers import DockerRenderer
+from reproenv.template import Template
 
 
 def test_docker_renderer_add_template():
     r = DockerRenderer("apt")
 
-    # Empty template.
-    with pytest.raises(ValueError):
-        r.add_template({})
-
     d = {
-        "urls": {"1.0.0": "foobar"},
-        "env": {"foo": "bar"},
-        "instructions": "echo hello\necho world",
         "name": "foobar",
-        "arguments": {
-            "required": [],
-            "optional": [],
+        "binaries": {
+            "urls": {"1.0.0": "foobar"},
+            "env": {"foo": "bar"},
+            "instructions": "echo hello\necho world",
+            "arguments": {
+                "required": [],
+                "optional": [],
+            },
+            "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
         },
-        "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
     }
 
-    # Not a BinariesTemplate type.
-    with pytest.raises(ValueError):
-        r.add_template(d)
+    # Not a Template type.
+    with pytest.raises(
+        RendererError, match="template must be an instance of 'Template' but got"
+    ):
+        r.add_template(d, method="binaries")
+
+    # Invalid method
+    with pytest.raises(
+        RendererError, match="method must be 'binaries', 'source' but got 'fakemethod"
+    ):
+        r.add_template(Template(d), method="fakemethod")
 
     # Test apt.
-    r.add_template(BinariesTemplate(d))
+    r.add_template(Template(d), method="binaries")
     assert len(r._parts) == 2
     assert r._parts[0] == 'ENV foo="bar"'
     assert (
@@ -43,7 +50,7 @@ def test_docker_renderer_add_template():
 
     # Test yum.
     r = DockerRenderer("yum")
-    r.add_template(BinariesTemplate(d))
+    r.add_template(Template(d), method="binaries")
     assert len(r._parts) == 2
     assert r._parts[0] == 'ENV foo="bar"'
     assert (
@@ -58,18 +65,20 @@ def test_docker_renderer_add_template():
 
     # Test required arguments.
     d = {
-        "urls": {"1.0.0": "foobar"},
-        "env": {"foo": "bar"},
-        "instructions": "echo hello {{ self.name }}",
         "name": "foobar",
-        "arguments": {
-            "required": ["name"],
-            "optional": [],
+        "binaries": {
+            "urls": {"1.0.0": "foobar"},
+            "env": {"foo": "bar"},
+            "instructions": "echo hello {{ self.name }}",
+            "arguments": {
+                "required": ["name"],
+                "optional": [],
+            },
+            "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
         },
-        "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
     }
     r = DockerRenderer("apt")
-    r.add_template(BinariesTemplate(d, name="Bjork"))
+    r.add_template(Template(d, binaries_kwds=dict(name="Bjork")), method="binaries")
     assert (
         str(r)
         == """ENV foo="bar"
@@ -77,7 +86,7 @@ RUN apt-get update -qq \\
     && apt-get install -y -q --no-install-recommends \\
            curl \\
     && rm -rf /var/lib/apt/lists/* \\
-    && echo hello {{ template_0.kwds_as_attrs.name }}"""
+    && echo hello {{ template_0.template.binaries.name }}"""
     )
     assert (
         r.render()
@@ -90,19 +99,21 @@ RUN apt-get update -qq \\
     )
 
     d = {
-        "urls": {"1.0.0": "foobar"},
-        "env": {"foo": "bar"},
-        "instructions": "echo hello {{ self.name | default('foo') }}",
         "name": "foobar",
-        "arguments": {
-            "required": [],
-            "optional": ["name"],
+        "binaries": {
+            "urls": {"1.0.0": "foobar"},
+            "env": {"foo": "bar"},
+            "instructions": "echo hello {{ self.name | default('foo') }}",
+            "arguments": {
+                "required": [],
+                "optional": ["name"],
+            },
+            "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
         },
-        "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
     }
 
     r = DockerRenderer("apt")
-    r.add_template(BinariesTemplate(d))
+    r.add_template(Template(d), method="binaries")
     assert (
         str(r)
         == """ENV foo="bar"
@@ -110,7 +121,7 @@ RUN apt-get update -qq \\
     && apt-get install -y -q --no-install-recommends \\
            curl \\
     && rm -rf /var/lib/apt/lists/* \\
-    && echo hello {{ template_0.kwds_as_attrs.name | default('foo') }}"""
+    && echo hello {{ template_0.template.binaries.name | default('foo') }}"""
     )
     assert (
         r.render()
