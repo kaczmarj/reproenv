@@ -86,14 +86,15 @@ class _Renderer:
         """
 
         if not isinstance(template, Template):
-            raise ValueError(
+            raise RendererError(
                 "template must be an instance of 'Template' but got"
                 f" '{type(template)}'."
             )
         if method not in allowed_installation_methods:
-            raise ValueError(
-                f"""method must {"', '".join(allowed_installation_methods)} be but"""
-                f" got '{method}'."
+            raise RendererError(
+                "method must be '{}' but got '{}'.".format(
+                    "', '".join(sorted(allowed_installation_methods)), method
+                )
             )
 
         template_method: _BaseInstallationTemplate = getattr(template, method)
@@ -186,7 +187,7 @@ class _Renderer:
         d: ty.List[ty.Dict],
     ) -> _Renderer:
         if not isinstance(d, list) or not d:
-            raise ValueError("Input must be a non-empty list.")
+            raise RendererError("Input must be a non-empty list.")
 
         for mapping in d:
             method_or_template = mapping["name"]
@@ -429,7 +430,7 @@ class SingularityRenderer(_Renderer):
             bootstrap = "library"
             image = base_image[10:]
         else:
-            raise ValueError("Unknown singularity bootstrap agent.")
+            raise RendererError("Unknown singularity bootstrap agent.")
 
         self._header = {"bootstrap": bootstrap, "from_": image}
         return self
@@ -491,7 +492,7 @@ def install(pkgs: ty.List[str], pkg_manager: str, opts="") -> str:
     elif pkg_manager == "yum":
         return yum_install(pkgs, opts)
     else:
-        raise ValueError(
+        raise RendererError(
             f"Unknown package manager '{pkg_manager}'. Allowed package"
             " managers are 'apt', 'dpkg', and 'yum'."
         )
