@@ -5,11 +5,73 @@ from __future__ import annotations
 import copy
 import typing as ty
 
-from reproenv.exceptions import TemplateError
+from reproenv.exceptions import TemplateKeywordArgumentError
+from reproenv.state import _validate_template
+from reproenv.types import _BinariesTemplateType
+from reproenv.types import _SourceTemplateType
+from reproenv.types import TemplateType
 from reproenv.types import allowed_pkg_managers
 from reproenv.types import pkg_managers_type
-from reproenv.types import BinariesTemplateType
-from reproenv.types import SourceTemplateType
+
+
+class Template:
+    """Template object.
+
+    This class makes it more convenient to work with templates. It also allows one to
+    set keyword arguments for instances of templates. For example, if a template calls
+    for an argument `version`, this class can be used to hold both the template and the
+    value for `version`.
+
+    Parameters
+    ----------
+    template : TemplateType
+        Dictionary that defines how to install software from pre-compiled binaries
+        and/or from source.
+    binaries_kwds : dict
+        Keyword arguments to pass to the binaries section of the template. All keys and
+        values must be strings.
+    source_kwds : dict
+        Keyword arguments passed to the source section of the template. All keys and
+        values must be strings.
+    """
+
+    def __init__(
+        self,
+        template: TemplateType,
+        binaries_kwds: ty.Mapping[str, str] = None,
+        source_kwds: ty.Mapping[str, str] = None,
+    ):
+        # Validate against JSON schema. Registered templates were already validated at
+        # registration time, but if we do not validate here, then in-memory templates
+        # (ie python dictionaries) will never be validated.
+        _validate_template(template)
+
+        self._template = copy.deepcopy(template)
+        self._binaries: ty.Optional[_BinariesTemplate] = None
+        self._binaries_kwds = {} if binaries_kwds is None else binaries_kwds
+        self._source: ty.Optional[_SourceTemplate] = None
+        self._source_kwds = {} if source_kwds is None else source_kwds
+
+        if "binaries" in self._template:
+            self._binaries = _BinariesTemplate(
+                self._template["binaries"], **self._binaries_kwds
+            )
+        if "source" in self._template:
+            self._source = _SourceTemplate(
+                self._template["source"], **self._source_kwds
+            )
+
+    @property
+    def name(self) -> str:
+        return self._template["name"]
+
+    @property
+    def binaries(self) -> ty.Union[None, _BinariesTemplate]:
+        return self._binaries
+
+    @property
+    def source(self) -> ty.Union[None, _SourceTemplate]:
+        return self._source
 
 
 class _BaseInstallationTemplate:
@@ -32,7 +94,7 @@ class _BaseInstallationTemplate:
 
     def __init__(
         self,
-        template: ty.Union[BinariesTemplateType, SourceTemplateType],
+        template: ty.Union[_BinariesTemplateType, _SourceTemplateType],
         **kwds: str,
     ) -> None:
         self._template = copy.deepcopy(template)
@@ -48,11 +110,13 @@ class _BaseInstallationTemplate:
         return f"{self.__class__.__name__}({self._template}, **{self._kwds})"
 
     def _validate_kwds(self):
-        """Raise `TemplateError` if keyword arguments to template are invalid."""
+        """Raise `TemplateKeywordArgumentError` if keyword arguments to template are
+        invalid.
+        """
         # Check that all required keywords were provided by user.
         req_keys_not_found = self.required_arguments.difference(self._kwds)
         if req_keys_not_found:
-            raise TemplateError(
+            raise TemplateKeywordArgumentError(
                 "Missing required arguments: '{}'.".format(
                     "', '".join(req_keys_not_found)
                 )
@@ -66,7 +130,7 @@ class _BaseInstallationTemplate:
             self.optional_arguments
         ).union({"pkg_manager"})
         if unknown_kwargs:
-            raise TemplateError(
+            raise TemplateKeywordArgumentError(
                 "Keyword argument provided is not specified in template: '{}'.".format(
                     "', '".join(unknown_kwargs)
                 )
@@ -78,7 +142,7 @@ class _BaseInstallationTemplate:
             # Templates for builds from source have versions `{"ANY"}` because they can
             # ideally build any version.
             if v not in self.versions and self.versions != {"ANY"}:
-                raise TemplateError(
+                raise TemplateKeywordArgumentError(
                     "Unknown version '{}'. Allowed versions are '{}'.".format(
                         v, "', '".join(self.versions)
                     )
@@ -134,34 +198,25 @@ class _BaseInstallationTemplate:
         return deps.get(pkg_manager, [])  # type: ignore
 
 
-class BinariesTemplate(_BaseInstallationTemplate):
-    def __init__(self, template: BinariesTemplateType, **kwds: str):
-        # TODO: how can we validate this better? Subset of JSON schema?
-        if "instructions" not in template or "urls" not in template:
-            raise TemplateError(
-                "Invalid template. Expected keys 'instructions' and 'urls'"
-            )
+class _BinariesTemplate(_BaseInstallationTemplate):
+    def __init__(self, template: _BinariesTemplateType, **kwds: str):
         super().__init__(template=template, **kwds)
 
     @property
     def urls(self) -> ty.Mapping[str, str]:
         # TODO: how can the code be changed so this cast is not necessary?
-        self._template = ty.cast(BinariesTemplateType, self._template)
-        return self._template["urls"]
+        self._template = ty.cast(_BinariesTemplateType, self._template)
+        return self._template.get("urls", {})
 
     @property
     def versions(self) -> ty.Set[str]:
         # TODO: how can the code be changed so this cast is not necessary?
-        self._template = ty.cast(BinariesTemplateType, self._template)
-        return set(self._template["urls"].keys())
+        self._template = ty.cast(_BinariesTemplateType, self._template)
+        return set(self.urls.keys())
 
 
-class SourceTemplate(_BaseInstallationTemplate):
-    def __init__(self, template: SourceTemplateType, **kwds: str):
-        if "instructions" not in template:
-            raise TemplateError("Missing required key: 'instructions'")
-        if "urls" in template:
-            raise TemplateError("Forbidden key present: 'urls'")
+class _SourceTemplate(_BaseInstallationTemplate):
+    def __init__(self, template: _SourceTemplateType, **kwds: str):
         super().__init__(template=template, **kwds)
 
     @property
