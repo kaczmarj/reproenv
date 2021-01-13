@@ -105,6 +105,7 @@ class _BaseInstallationTemplate:
         self._kwds = kwds
 
         self._validate_kwds()
+        self._set_kwds_as_attrs()
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self._template}, **{self._kwds})"
@@ -113,6 +114,15 @@ class _BaseInstallationTemplate:
         """Raise `TemplateKeywordArgumentError` if keyword arguments to template are
         invalid.
         """
+        # Check that keywords do not shadow attributes of this object.
+        shadowed = set(self._kwds).intersection(dir(self))
+        if shadowed:
+            raise TemplateKeywordArgumentError(
+                "Invalid keyword arguments: '{}'. If these keywords are used by the"
+                " template, then the template must be modified to use different"
+                " keywords.".format("', '".join(shadowed))
+            )
+
         # Check that all required keywords were provided by user.
         req_keys_not_found = self.required_arguments.difference(self._kwds)
         if req_keys_not_found:
@@ -122,13 +132,10 @@ class _BaseInstallationTemplate:
                 )
             )
 
-        # TODO: should `pkg_manager` be provided if any requirements are defined?
-
-        # Check that unknown kwargs weren't passed. We let 'pkg_manager' through so
-        # that it can be passed to all templates without error.
-        unknown_kwargs = set(self._kwds) - self.required_arguments.union(
-            self.optional_arguments
-        ).union({"pkg_manager"})
+        # Check that unknown kwargs weren't passed.
+        unknown_kwargs = set(self._kwds).difference(
+            self.required_arguments.union(self.optional_arguments)
+        )
         if unknown_kwargs:
             raise TemplateKeywordArgumentError(
                 "Keyword argument provided is not specified in template: '{}'.".format(
@@ -148,14 +155,10 @@ class _BaseInstallationTemplate:
                     )
                 )
 
-    @property
-    def kwds_as_attrs(self):
-        """Return object that can reference keyword arguments as attributes.
-
-        These keywords are attributes of a separate object so that keyword names do not
-        overwrite attributes defined by this class.
-        """
-        return _AttrDict(**self._kwds)
+    def _set_kwds_as_attrs(self):
+        # we check if keywords will shadow object's methods in `self._validate_kwds()`.
+        for k, v in self._kwds.items():
+            setattr(self, k, v)
 
     @property
     def template(self):
@@ -222,8 +225,3 @@ class _SourceTemplate(_BaseInstallationTemplate):
     @property
     def versions(self) -> ty.Set[str]:
         return {"ANY"}
-
-
-class _AttrDict:
-    def __init__(self, **kwds: ty.Dict[str, str]):
-        self.__dict__.update(kwds)

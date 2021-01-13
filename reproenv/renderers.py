@@ -22,7 +22,6 @@ import jinja2
 from reproenv.exceptions import RendererError
 from reproenv.exceptions import TemplateError
 from reproenv.state import _TemplateRegistry
-from reproenv.template import _AttrDict
 from reproenv.template import _BaseInstallationTemplate
 from reproenv.template import Template
 from reproenv.types import _SingularityHeaderType
@@ -41,7 +40,6 @@ jinja_env = jinja2.Environment(undefined=jinja2.StrictUndefined)
 # one created with ReproEnv.
 
 
-# TODO: give this a better name because now it's not a pair.
 class _TemplateMethodPair(ty.NamedTuple):
     """Object to hold pair of template and the requested installation method. The
     template is queried using the installation method.
@@ -49,7 +47,6 @@ class _TemplateMethodPair(ty.NamedTuple):
 
     template: Template
     method: installation_methods_type
-    kwds_as_attrs: _AttrDict
 
 
 class _Renderer:
@@ -103,13 +100,11 @@ class _Renderer:
         if template_method is None:
             raise RendererError(f"template does not have entry for: '{method}'")
 
-        # TODO: Is it safe to use template number?
         t_id = f"template_{len(self._templates)}"
         t_id_dot = t_id + "."
         self._templates[t_id] = _TemplateMethodPair(
             template=template,
             method=method,
-            kwds_as_attrs=template_method.kwds_as_attrs,
         )
 
         # Add environment.
@@ -128,9 +123,8 @@ class _Renderer:
                 run = install(pkgs=dependencies, pkg_manager=self.pkg_manager)
                 # TODO: Install dpkg packages if they exist and if we are using `apt`.
                 run += "\n"
-            # Notice that we use `t_id` and not `t_id_dot` here.
             run += template_method.instructions.replace(
-                "self.", f"{t_id}.kwds_as_attrs."
+                "self.", f"{t_id}.template.{method}."
             )
             self.run(run)
 
