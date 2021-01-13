@@ -22,10 +22,12 @@ import jinja2
 from reproenv.exceptions import RendererError
 from reproenv.exceptions import TemplateError
 from reproenv.state import _TemplateRegistry
-from reproenv.template import BinariesTemplate
-from reproenv.template import SourceTemplate
+from reproenv.template import _AttrDict
+from reproenv.template import _BaseInstallationTemplate
+from reproenv.template import Template
 from reproenv.types import _SingularityHeaderType
 from reproenv.types import allowed_pkg_managers
+from reproenv.types import allowed_installation_methods
 from reproenv.types import installation_methods_type
 from reproenv.types import pkg_managers_type
 
@@ -37,6 +39,17 @@ jinja_env = jinja2.Environment(undefined=jinja2.StrictUndefined)
 
 # TODO: add a flag that avoids buggy behavior when basing a new container on
 # one created with ReproEnv.
+
+
+# TODO: give this a better name because now it's not a pair.
+class _TemplateMethodPair(ty.NamedTuple):
+    """Object to hold pair of template and the requested installation method. The
+    template is queried using the installation method.
+    """
+
+    template: Template
+    method: installation_methods_type
+    kwds_as_attrs: _AttrDict
 
 
 class _Renderer:
@@ -51,7 +64,7 @@ class _Renderer:
 
         self.pkg_manager = pkg_manager
         self._users = {"root"} if users is None else users
-        self._templates: ty.Dict[str, ty.Union[BinariesTemplate, SourceTemplate]] = {}
+        self._templates: ty.Dict[str, _TemplateMethodPair] = {}
 
     @property
     def jinja_template(self) -> jinja2.Template:
@@ -62,43 +75,63 @@ class _Renderer:
         return self._users
 
     def add_template(
-        self, template: ty.Union[BinariesTemplate, SourceTemplate]
+        self, template: Template, method: installation_methods_type
     ) -> _Renderer:
-        # First, replace all mentions of 'self' with some unique ID. (In
-        # practice, we actually match 'self.' to avoid unwanted matches.)
-        # Store a mapping of the unique IDs to the object that has the options
-        # as attributes.
-        # Then, add env (if it exists) and instructions.
-        # The validation will have to happen at render time.
+        """Add a template to the renderer.
 
-        if not isinstance(template, (BinariesTemplate, SourceTemplate)):
+        Parameters
+        ----------
+        template : Template
+            The template to add. To reference templates by name, use
+            `.add_registered_template`.
+        method : str
+            The method to use to install the software described in the template.
+        """
+
+        if not isinstance(template, Template):
             raise ValueError(
-                "Template must be an instance of `BinariesTemplate` or"
-                f" `SourceTemplate`. Got {type(template)}"
+                "template must be an instance of 'Template' but got"
+                f" '{type(template)}'."
+            )
+        if method not in allowed_installation_methods:
+            raise ValueError(
+                f"""method must {"', '".join(allowed_installation_methods)} be but"""
+                f" got '{method}'."
             )
 
+        template_method: _BaseInstallationTemplate = getattr(template, method)
+        if template_method is None:
+            raise RendererError(f"template does not have entry for: '{method}'")
+
+        # TODO: Is it safe to use template number?
         t_id = f"template_{len(self._templates)}"
         t_id_dot = t_id + "."
-        self._templates[t_id] = template
+        self._templates[t_id] = _TemplateMethodPair(
+            template=template,
+            method=method,
+            kwds_as_attrs=template_method.kwds_as_attrs,
+        )
 
         # Add environment.
-        # TODO: double-check this..
-        if template.env:
+        if template_method.env:
             d: ty.Mapping[str, str] = {
                 k.replace("self.", t_id_dot): v.replace("self.", t_id_dot)
-                for k, v in template.env.items()
+                for k, v in template_method.env.items()
             }
             self.env(**d)
 
         # Add installation instructions.
-        if template.instructions:
+        if template_method.instructions:
             run = ""
-            dependencies = template.dependencies(self.pkg_manager)
+            dependencies = template_method.dependencies(self.pkg_manager)
             if dependencies:
                 run = install(pkgs=dependencies, pkg_manager=self.pkg_manager)
+                # TODO: Install dpkg packages if they exist and if we are using `apt`.
                 run += "\n"
             # Notice that we use `t_id` and not `t_id_dot` here.
-            run += template.instructions.replace("self.", f"{t_id}.kwds_as_attrs.")
+            run += template_method.instructions.replace(
+                "self.", f"{t_id}.kwds_as_attrs."
+            )
             self.run(run)
 
         return self
@@ -106,36 +139,36 @@ class _Renderer:
     def add_registered_template(
         self,
         name: str,
-        installation_method: installation_methods_type = None,
-        **kwargs,
+        method: installation_methods_type = None,
+        **kwds,
     ) -> _Renderer:
 
+        # Template was validated at registration time.
         template_dict = _TemplateRegistry.get(name)
 
         # By default, prefer 'binaries', but use 'source' if 'binaries' is not defined.
-        if installation_method is None:
-            if "binaries" in template_dict:
-                installation_method = "binaries"
-            else:
-                installation_method = "source"
-
-        if installation_method not in template_dict:
-            raise TemplateError(
-                "Installation method '{}' not defined for template '{}'."
-                " Options are '{}'.".format(
-                    installation_method, name, "', '".join(template_dict.keys())
-                )
+        # TODO: should we require user to provide method?
+        if method is None:
+            method = "binaries" if "binaries" in template_dict else "source"
+        if method not in template_dict:
+            raise RendererError(
+                f"Installation method '{method}' not defined for template '{name}'."
+                " Options are '{}'.".format("', '".join(template_dict.keys()))
             )
 
-        # We ignore the type here because we've done enough checking ourselves.
-        t = template_dict[installation_method]
-        if installation_method == "binaries":
-            self.add_template(BinariesTemplate(t, **kwargs))  # type: ignore
-        elif installation_method == "source":
-            self.add_template(SourceTemplate(t, **kwargs))
-        else:
-            raise RendererError("Unknown installation method.")
+        binaries_kwds = source_kwds = None
+        if method == "binaries":
+            binaries_kwds = kwds
+        elif method == "source":
+            source_kwds = kwds
 
+        template = Template(
+            template=template_dict,
+            binaries_kwds=binaries_kwds,
+            source_kwds=source_kwds,
+        )
+
+        self.add_template(template=template, method=method)
         return self
 
     def arg(self, key: str, value: str = None):
