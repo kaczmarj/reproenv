@@ -3,6 +3,7 @@
 from reproenv.renderers import DockerRenderer  # noqa: F401
 from reproenv.renderers import SingularityRenderer  # noqa: F401
 from reproenv.state import _TemplateRegistry
+from reproenv.template import Template  # noqa: F401
 from reproenv._version import get_versions
 
 __version__ = get_versions()["version"]
