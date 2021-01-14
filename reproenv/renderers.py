@@ -22,6 +22,7 @@ import jinja2
 from reproenv.exceptions import RendererError
 from reproenv.exceptions import TemplateError
 from reproenv.state import _TemplateRegistry
+from reproenv.state import _validate_renderer
 from reproenv.template import _BaseInstallationTemplate
 from reproenv.template import Template
 from reproenv.types import _SingularityHeaderType
@@ -38,6 +39,8 @@ jinja_env = jinja2.Environment(undefined=jinja2.StrictUndefined)
 
 # TODO: add a flag that avoids buggy behavior when basing a new container on
 # one created with ReproEnv.
+
+# TODO: add `install` instance method to `_Renderer`.
 
 
 class _TemplateMethodPair(ty.NamedTuple):
@@ -182,18 +185,23 @@ class _Renderer:
     def from_(self, base_image: str) -> _Renderer:
         raise NotImplementedError()
 
-    def from_dict(
-        self,
-        d: ty.List[ty.Dict],
-    ) -> _Renderer:
-        if not isinstance(d, list) or not d:
-            raise RendererError("Input must be a non-empty list.")
+    @classmethod
+    def from_dict(cls, d: ty.Mapping) -> _Renderer:
+        """Instantiate a new renderer from a dictionary of instructions."""
+        # raise error if invalid
+        _validate_renderer(d)
 
-        for mapping in d:
+        pkg_manager = d["pkg_manager"]
+        users = d.get("existing_users", None)
+
+        # create new renderer object
+        renderer = cls(pkg_manager=pkg_manager, users=users)
+
+        for mapping in d["instructions"]:
             method_or_template = mapping["name"]
             kwds = mapping["kwds"]
             # for method_or_template, kwargs in d.items:
-            this_instance_method = getattr(self, method_or_template, None)
+            this_instance_method = getattr(renderer, method_or_template, None)
             # Method exists and is something like 'copy', 'env', 'run', etc.
             if this_instance_method is not None:
                 try:
@@ -206,13 +214,13 @@ class _Renderer:
             # This is actually a template.
             else:
                 try:
-                    self.add_registered_template(method_or_template, **kwds)
+                    renderer.add_registered_template(method_or_template, **kwds)
                 except TemplateError as e:
                     raise RendererError(
                         f"Error on template '{method_or_template}'. Please see"
                         " the traceback above for details. Was the template registered?"
                     ) from e
-        return self
+        return renderer
 
     def label(self, **kwds: ty.Mapping[str, str]) -> _Renderer:
         raise NotImplementedError()
