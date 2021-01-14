@@ -16,6 +16,7 @@ try:
 except ImportError:
     from yaml import SafeLoader  # type: ignore
 
+from reproenv.exceptions import RendererError
 from reproenv.exceptions import TemplateError
 from reproenv.exceptions import TemplateNotFound
 from reproenv.types import TemplateType
@@ -43,6 +44,14 @@ def _validate_template(template: TemplateType):
     # For now, this is taken care of in Renderer classes, but it would be good to move
     # that behavior here, so we can catch errors early.
     pass
+
+
+def _validate_renderer(d):
+    """Validate renderer dictionary against JSON schema. Raise exception if invalid."""
+    try:
+        jsonschema.validate(d, schema=_RENDERER_SCHEMA)
+    except jsonschema.exceptions.ValidationError as e:
+        raise RendererError(f"Invalid renderer dictionary: {e.message}.") from e
 
 
 class _TemplateRegistry:
