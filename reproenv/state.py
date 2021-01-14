@@ -95,11 +95,31 @@ class _TemplateRegistry:
 
         _validate_template(template)
 
-        # TODO: Add the template name as an optional key to the renderer schema. This is
-        # so that the dictionary passed to the `Renderer().from_dict()` method can
+        # Add the template name as an optional key to the renderer schema. This is
+        # so that the dictionary passed to the `Renderer.from_dict()` method can
         # contain names of registered templates. These templates are not known when the
         # renderer schema is created.
-        pass
+        # However, this schema is lax because the kwds just has to be an object. Keys
+        # and values in kwds are validated in the renderer.
+        key = f"template_{name.replace(' ', '_')}"
+        _RENDERER_SCHEMA["definitions"][key] = {
+            "required": ["name", "kwds"],
+            "properties": {
+                "name": {"enum": [name]},
+                "kwds": {
+                    "type": "object",
+                    # "required": [],
+                    # "properties": {
+                    #     "version": {"type": "string"},
+                    # },
+                    # "additionalProperties": False,
+                },
+            },
+            "additionalProperties": False,
+        }
+        _RENDERER_SCHEMA["properties"]["instructions"]["items"]["oneOf"].append(
+            {"$ref": f"#/definitions/{key}"},
+        )
 
         # Add template to registry.
         # TODO: should we log a message if overwriting a key-value pair?
