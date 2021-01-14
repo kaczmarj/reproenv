@@ -117,9 +117,11 @@ class _TemplateRegistry:
             },
             "additionalProperties": False,
         }
-        _RENDERER_SCHEMA["properties"]["instructions"]["items"]["oneOf"].append(
-            {"$ref": f"#/definitions/{key}"},
-        )
+        # Do not add template to `instructions` properties if it has already been added.
+        template_ref = {"$ref": f"#/definitions/{key}"}
+        oneof = _RENDERER_SCHEMA["properties"]["instructions"]["items"]["oneOf"]
+        if template_ref not in oneof:
+            oneof.append(template_ref)
 
         # Add template to registry.
         # TODO: should we log a message if overwriting a key-value pair?
