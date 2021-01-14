@@ -74,6 +74,42 @@ class _Renderer:
     def users(self) -> ty.Set[str]:
         return self._users
 
+    @classmethod
+    def from_dict(cls, d: ty.Mapping) -> _Renderer:
+        """Instantiate a new renderer from a dictionary of instructions."""
+        # raise error if invalid
+        _validate_renderer(d)
+
+        pkg_manager = d["pkg_manager"]
+        users = d.get("existing_users", None)
+
+        # create new renderer object
+        renderer = cls(pkg_manager=pkg_manager, users=users)
+
+        for mapping in d["instructions"]:
+            method_or_template = mapping["name"]
+            kwds = mapping["kwds"]
+            this_instance_method = getattr(renderer, method_or_template, None)
+            # Method exists and is something like 'copy', 'env', 'run', etc.
+            if this_instance_method is not None:
+                try:
+                    this_instance_method(**kwds)
+                except Exception as e:
+                    raise RendererError(
+                        f"Error on step '{method_or_template}'. Please see the"
+                        " traceback above for details."
+                    ) from e
+            # This is actually a template.
+            else:
+                try:
+                    renderer.add_registered_template(method_or_template, **kwds)
+                except TemplateError as e:
+                    raise RendererError(
+                        f"Error on template '{method_or_template}'. Please see"
+                        " the traceback above for details. Was the template registered?"
+                    ) from e
+        return renderer
+
     def add_template(
         self, template: Template, method: installation_methods_type
     ) -> _Renderer:
@@ -184,43 +220,6 @@ class _Renderer:
 
     def from_(self, base_image: str) -> _Renderer:
         raise NotImplementedError()
-
-    @classmethod
-    def from_dict(cls, d: ty.Mapping) -> _Renderer:
-        """Instantiate a new renderer from a dictionary of instructions."""
-        # raise error if invalid
-        _validate_renderer(d)
-
-        pkg_manager = d["pkg_manager"]
-        users = d.get("existing_users", None)
-
-        # create new renderer object
-        renderer = cls(pkg_manager=pkg_manager, users=users)
-
-        for mapping in d["instructions"]:
-            method_or_template = mapping["name"]
-            kwds = mapping["kwds"]
-            # for method_or_template, kwargs in d.items:
-            this_instance_method = getattr(renderer, method_or_template, None)
-            # Method exists and is something like 'copy', 'env', 'run', etc.
-            if this_instance_method is not None:
-                try:
-                    this_instance_method(**kwds)
-                except Exception as e:
-                    raise RendererError(
-                        f"Error on step '{method_or_template}'. Please see the"
-                        " traceback above for details."
-                    ) from e
-            # This is actually a template.
-            else:
-                try:
-                    renderer.add_registered_template(method_or_template, **kwds)
-                except TemplateError as e:
-                    raise RendererError(
-                        f"Error on template '{method_or_template}'. Please see"
-                        " the traceback above for details. Was the template registered?"
-                    ) from e
-        return renderer
 
     def label(self, **kwds: ty.Mapping[str, str]) -> _Renderer:
         raise NotImplementedError()
