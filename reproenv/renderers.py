@@ -35,7 +35,7 @@ from reproenv.types import pkg_managers_type
 # configured to dislike undefined attributes. For example, if a template is
 # created with the string '{{ foo.bar }}' and 'foo' does not have a 'bar'
 # attribute, an error will be thrown when the jinja template is instantiated.
-jinja_env = jinja2.Environment(undefined=jinja2.StrictUndefined)
+_jinja_env = jinja2.Environment(undefined=jinja2.StrictUndefined)
 
 # TODO: add a flag that avoids buggy behavior when basing a new container on
 # one created with ReproEnv.
@@ -43,13 +43,22 @@ jinja_env = jinja2.Environment(undefined=jinja2.StrictUndefined)
 # TODO: add `install` instance method to `_Renderer`.
 
 
-class _TemplateMethodPair(ty.NamedTuple):
-    """Object to hold pair of template and the requested installation method. The
-    template is queried using the installation method.
-    """
-
-    template: Template
-    method: installation_methods_type
+def _render_string_from_template(
+    source: str, template: _BaseInstallationTemplate
+) -> str:
+    """Take a string from a template and render """
+    source = source.replace("self.", "template.")
+    tmpl = _jinja_env.from_string(source)
+    err = (
+        "A template included in this renderer raised an error. Please check the"
+        " template definition. A required argument might not be included in the"
+        " required arguments part of the template. Variables in the template should"
+        " start with `self.`."
+    )
+    try:
+        return tmpl.render(template=template)
+    except jinja2.exceptions.UndefinedError as e:
+        raise RendererError(err) from e
 
 
 class _Renderer:
@@ -64,11 +73,10 @@ class _Renderer:
 
         self.pkg_manager = pkg_manager
         self._users = {"root"} if users is None else users
-        self._templates: ty.Dict[str, _TemplateMethodPair] = {}
 
     @property
     def jinja_template(self) -> jinja2.Template:
-        return jinja_env.from_string(str(self))
+        return _jinja_env.from_string(str(self))
 
     @property
     def users(self) -> ty.Set[str]:
@@ -139,34 +147,42 @@ class _Renderer:
         template_method: _BaseInstallationTemplate = getattr(template, method)
         if template_method is None:
             raise RendererError(f"template does not have entry for: '{method}'")
+        # Validate kwds passed by user to template, and raise an exception if any are
+        # invalid.
+        template_method.validate_kwds()
 
-        t_id = f"template_{len(self._templates)}"
-        t_id_dot = t_id + "."
-        self._templates[t_id] = _TemplateMethodPair(
-            template=template,
-            method=method,
-        )
+        # If we keep the `self.VAR` syntax of the template, then we need to pass
+        # `self=template_method` to the renderer function. But that function is an
+        # instance method, so passing `self` will override the `self` argument.
+        # To get around this, we replace `self.` with something that is not an
+        # argument to the renderer function.
 
-        # Add environment.
+        # Add environment (render any jinja templates).
         if template_method.env:
             d: ty.Mapping[str, str] = {
-                k.replace("self.", t_id_dot): v.replace("self.", t_id_dot)
+                _render_string_from_template(
+                    k, template_method
+                ): _render_string_from_template(v, template_method)
                 for k, v in template_method.env.items()
             }
             self.env(**d)
 
-        # Add installation instructions.
+        # Add installation instructions (render any jinja templates).
         if template_method.instructions:
-            run = ""
+            command = ""
             dependencies = template_method.dependencies(self.pkg_manager)
             if dependencies:
-                run = install(pkgs=dependencies, pkg_manager=self.pkg_manager)
-                # TODO: Install dpkg packages if they exist and if we are using `apt`.
-                run += "\n"
-            run += template_method.instructions.replace(
-                "self.", f"{t_id}.template.{method}."
+                command += _install(pkgs=dependencies, pkg_manager=self.pkg_manager)
+                # Install debs if we are using apt and debs are requested.
+                if self.pkg_manager == "apt":
+                    debs = template_method.dependencies("debs")
+                    if debs:
+                        command += "\n" + _apt_install_debs(debs)
+                command += "\n"
+            command += _render_string_from_template(
+                template_method.instructions, template_method
             )
-            self.run(run)
+            self.run(command)
 
         return self
 
@@ -221,33 +237,11 @@ class _Renderer:
     def from_(self, base_image: str) -> _Renderer:
         raise NotImplementedError()
 
-    def label(self, **kwds: ty.Mapping[str, str]) -> _Renderer:
+    def install(self, pkgs: ty.List[str], opts="") -> _Renderer:
         raise NotImplementedError()
 
-    def render(self) -> str:
-        err = (
-            "A template included in this renderer raised an error. Please check the"
-            " template definition. A required argument might not be included in the"
-            " required arguments part of the template. Variables in the template should"
-            " start with `self.`."
-        )
-        try:
-            s = self.jinja_template.render(**self._templates)
-        except jinja2.exceptions.UndefinedError as e:
-            raise RendererError(err) from e
-        if (
-            jinja_env.variable_start_string not in s
-            and jinja_env.variable_end_string not in s
-        ):
-            return s
-
-        # Render the string again. This is sometimes necessary because some
-        # defaults in the template are rendered as {{ self.X }}. These defaults
-        # need to be rendered again.
-        try:
-            return jinja_env.from_string(s).render(**self._templates)
-        except jinja2.exceptions.UndefinedError as e:
-            raise RendererError(err) from e
+    def label(self, **kwds: ty.Mapping[str, str]) -> _Renderer:
+        raise NotImplementedError()
 
     def run(self, command: str) -> _Renderer:
         raise NotImplementedError()
@@ -315,6 +309,13 @@ class DockerRenderer(_Renderer):
         self._parts.append(s)
         return self
 
+    def install(self, pkgs: ty.List[str], opts="") -> DockerRenderer:
+        """Install system packages."""
+        command = _install(pkgs, pkg_manager=self.pkg_manager, opts=opts)
+        command = _indent_run_instruction(command)
+        self.run(command)
+        return self
+
     def label(self, **kwds: ty.Mapping[str, str]) -> DockerRenderer:
         """Add a Dockerfile `LABEL` instruction."""
         s = "LABEL " + " \\\n      ".join(f'{k}="{v}"' for k, v in kwds.items())
@@ -328,7 +329,7 @@ class DockerRenderer(_Renderer):
         # if s.startswith("'"):
         #     s = s[1:-1]  # Remove quotes on either end of the string.
         s = command
-        s = indent("RUN " + s, add_list_op=True)
+        s = _indent_run_instruction(f"RUN {s}")
         self._parts.append(s)
         return self
 
@@ -442,6 +443,12 @@ class SingularityRenderer(_Renderer):
         self._header = {"bootstrap": bootstrap, "from_": image}
         return self
 
+    def install(self, pkgs: ty.List[str], opts="") -> SingularityRenderer:
+        """Install system packages."""
+        command = _install(pkgs, pkg_manager=self.pkg_manager, opts=opts)
+        self.run(command)
+        return self
+
     def label(self, **kwds: ty.Mapping[str, str]) -> SingularityRenderer:
         # TODO: why are we getting this error?
         # Argument 1 to "update" of "dict" has incompatible type
@@ -468,48 +475,43 @@ class SingularityRenderer(_Renderer):
         return self
 
 
-def indent(string, indent=4, add_list_op=False):
+def _indent_run_instruction(string: str, indent=4) -> str:
     """Return indented string for Dockerfile `RUN` command."""
     out = []
     lines = string.splitlines()
-
     for ii, line in enumerate(lines):
         line = line.rstrip()
+        is_last_line = ii == len(lines) - 1
         already_cont = line.startswith(("&&", "&", "||", "|", "fi"))
+        is_comment = line.startswith("#")
         previous_cont = lines[ii - 1].endswith("\\") or lines[ii - 1].startswith("if")
-        if ii:
-            if add_list_op and not already_cont and not previous_cont:
+        if ii:  # do not apply to first line
+            if not already_cont and not previous_cont and not is_comment:
                 line = "&& " + line
             if not already_cont and previous_cont:
-                line = " " * (indent + 3) + line
+                line = " " * (indent + 3) + line  # indent + len("&& ")
             else:
                 line = " " * indent + line
-        if ii != len(lines) - 1:
-            if not line.endswith("\\"):
-                line += " \\"
+        if not is_last_line and not line.endswith("\\") and not is_comment:
+            line += " \\"
         out.append(line)
     return "\n".join(out)
 
 
-def install(pkgs: ty.List[str], pkg_manager: str, opts="") -> str:
+def _install(pkgs: ty.List[str], pkg_manager: str, opts="") -> str:
     if pkg_manager == "apt":
-        return apt_install(pkgs, opts)
-    elif pkg_manager == "dpkg":
-        return dpkg_install(pkgs, opts)
+        return _apt_install(pkgs, opts)
     elif pkg_manager == "yum":
-        return yum_install(pkgs, opts)
+        return _yum_install(pkgs, opts)
     else:
-        raise RendererError(
-            f"Unknown package manager '{pkg_manager}'. Allowed package"
-            " managers are 'apt', 'dpkg', and 'yum'."
-        )
+        raise RendererError(f"Unknown package manager '{pkg_manager}'.")
 
 
-def apt_install(pkgs: ty.List[str], opts="", sort=True) -> str:
+def _apt_install(
+    pkgs: ty.List[str], opts="-q --no-install-recommends", sort=True
+) -> str:
     if sort:
         pkgs = sorted(pkgs)
-    if not opts:
-        opts = "-q --no-install-recommends"
     s = """\
 apt-get update -qq
 apt-get install -y {opts} \\
@@ -521,26 +523,28 @@ rm -rf /var/lib/apt/lists/*
     return s.strip()
 
 
-def dpkg_install(urls: ty.List[str], opts="") -> str:
+def _apt_install_debs(urls: ty.List[str], opts="-q", sort=True) -> str:
     def install_one(url: str):
         return f"""\
-curl -fsSL --retry 5 -o /tmp/toinstall.deb {url}
-dpkg -i {opts} /tmp/toinstall.deb
-rm /tmp/toinstall.deb"""
+_reproenv_tmppath="$(mktemp -t tmp.XXXXXXXXXX.deb)"
+curl -fsSL --retry 5 -o "${{_reproenv_tmppath}}" {url}
+apt-get install --yes {opts} "${{_reproenv_tmppath}}"
+rm "${{_reproenv_tmppath}}\""""
 
-    s = "\n".join(install_one(u) for u in urls)
-    s += """\
+    if sort:
+        urls = sorted(urls)
+
+    s = "\n".join(map(install_one, urls))
+    s += """
 apt-get update -qq
-apt-get install -y -q --fix-missing
+apt-get install --yes --quiet --fix-missing
 rm -rf /var/lib/apt/lists/*"""
     return s
 
 
-def yum_install(pkgs: ty.List[str], opts="", sort=True) -> str:
+def _yum_install(pkgs: ty.List[str], opts="-q", sort=True) -> str:
     if sort:
         pkgs = sorted(pkgs)
-    if not opts:
-        opts = "-q"
     s = """\
 yum install -y {opts} \\
     {pkgs}
