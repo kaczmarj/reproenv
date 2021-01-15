@@ -13,7 +13,16 @@ jobs:
       matrix:
         python-version: ['3.9', '3.8', '3.7']
     steps:
+      - name: Cache Singularity
+        id: cache-singularity
+        uses: actions/cache@v2
+        with:
+          path: $HOME/singularity
+          key: ${{ runner.os }}-singularity-3.6.2  # Change this if upgrading singularity
+          restore-keys: |
+            ${{ runner.os }}-singularity-
       - name: Install Singularity
+        if: steps.cache-singularity.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
@@ -24,10 +33,12 @@ jobs:
           curl -fsSL https://github.com/hpcng/singularity/releases/download/v3.6.2/singularity-3.6.2.tar.gz \
           | tar xz
           cd singularity
-          ./mconfig
+          ./mconfig --prefix=$HOME/singularity
           cd builddir
           make -j
           sudo make install
+      - name: Add Singularity to PATH
+        run: echo $HOME/singularity >> $GITHUB_PATH
       - uses: actions/checkout@v2
       - name: Set up Python
         uses: actions/setup-python@v2
