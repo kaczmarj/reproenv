@@ -172,6 +172,7 @@ class _Renderer:
             command = ""
             dependencies = template_method.dependencies(self.pkg_manager)
             if dependencies:
+                # TODO: how can we pass in arguments here?
                 command += _install(pkgs=dependencies, pkg_manager=self.pkg_manager)
                 # Install debs if we are using apt and debs are requested.
                 if self.pkg_manager == "apt":
@@ -498,7 +499,7 @@ def _indent_run_instruction(string: str, indent=4) -> str:
     return "\n".join(out)
 
 
-def _install(pkgs: ty.List[str], pkg_manager: str, opts="") -> str:
+def _install(pkgs: ty.List[str], pkg_manager: str, opts: str = None) -> str:
     if pkg_manager == "apt":
         return _apt_install(pkgs, opts)
     elif pkg_manager == "yum":
@@ -507,11 +508,13 @@ def _install(pkgs: ty.List[str], pkg_manager: str, opts="") -> str:
         raise RendererError(f"Unknown package manager '{pkg_manager}'.")
 
 
-def _apt_install(
-    pkgs: ty.List[str], opts="-q --no-install-recommends", sort=True
-) -> str:
-    if sort:
-        pkgs = sorted(pkgs)
+def _apt_install(pkgs: ty.List[str], opts: str = None, sort=True) -> str:
+    """Return command to install deb packages with `apt-get` (Debian-based distros).
+
+    `opts` are options passed to `yum install`. Default is "-q --no-install-recommends".
+    """
+    pkgs = sorted(pkgs) if sort else pkgs
+    opts = "-q --no-install-recommends" if opts is None else opts
     s = """\
 apt-get update -qq
 apt-get install -y {opts} \\
@@ -523,7 +526,12 @@ rm -rf /var/lib/apt/lists/*
     return s.strip()
 
 
-def _apt_install_debs(urls: ty.List[str], opts="-q", sort=True) -> str:
+def _apt_install_debs(urls: ty.List[str], opts: str = None, sort=True) -> str:
+    """Return command to install deb packages with `apt-get` (Debian-based distros).
+
+    `opts` are options passed to `yum install`. Default is "-q".
+    """
+
     def install_one(url: str):
         return f"""\
 _reproenv_tmppath="$(mktemp -t tmp.XXXXXXXXXX.deb)"
@@ -531,8 +539,8 @@ curl -fsSL --retry 5 -o "${{_reproenv_tmppath}}" {url}
 apt-get install --yes {opts} "${{_reproenv_tmppath}}"
 rm "${{_reproenv_tmppath}}\""""
 
-    if sort:
-        urls = sorted(urls)
+    urls = sorted(urls) if sort else urls
+    opts = "-q" if opts is None else opts
 
     s = "\n".join(map(install_one, urls))
     s += """
@@ -542,13 +550,18 @@ rm -rf /var/lib/apt/lists/*"""
     return s
 
 
-def _yum_install(pkgs: ty.List[str], opts="-q", sort=True) -> str:
-    if sort:
-        pkgs = sorted(pkgs)
+def _yum_install(pkgs: ty.List[str], opts: str = None, sort=True) -> str:
+    """Return command to install packages with `yum` (CentOS, Fedora).
+
+    `opts` are options passed to `yum install`. Default is "-q".
+    """
+    pkgs = sorted(pkgs) if sort else pkgs
+    opts = "-q" if opts is None else opts
+
     s = """\
 yum install -y {opts} \\
     {pkgs}
-yum clean all \\
+yum clean all
 rm -rf /var/cache/yum/*
 """.format(
         opts=opts, pkgs=" \\\n    ".join(pkgs)
