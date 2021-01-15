@@ -3,6 +3,8 @@
 from pathlib import Path
 import subprocess
 
+import pytest
+
 from reproenv.renderers import DockerRenderer
 from reproenv.renderers import SingularityRenderer
 from reproenv.state import _TemplateRegistry
@@ -13,6 +15,7 @@ _template_filepath = Path(__file__).parent / "sample-template-jq.yaml"
 
 
 @skip_if_no_docker
+@pytest.mark.long
 def test_build_docker_from_dict_apt(tmp_path):
     import docker
 
@@ -45,6 +48,7 @@ def test_build_docker_from_dict_apt(tmp_path):
 
 
 @skip_if_no_docker
+@pytest.mark.long
 def test_build_docker_from_dict_yum(tmp_path):
     import docker
 
@@ -76,6 +80,7 @@ def test_build_docker_from_dict_yum(tmp_path):
 
 
 @skip_if_no_singularity
+@pytest.mark.long
 def test_build_singularity_from_dict_apt(tmp_path):
     _TemplateRegistry._reset()
     _TemplateRegistry.register("jq", _template_filepath)
@@ -122,6 +127,7 @@ def test_build_singularity_from_dict_apt(tmp_path):
 
 
 @skip_if_no_singularity
+@pytest.mark.long
 def test_build_singularity_from_dict_yum(tmp_path):
     _TemplateRegistry._reset()
     _TemplateRegistry.register("jq", _template_filepath)
@@ -167,6 +173,7 @@ def test_build_singularity_from_dict_yum(tmp_path):
 
 
 @skip_if_no_docker
+@pytest.mark.long
 def test_build_docker_jq16_binaries(tmp_path):
     import docker
 
@@ -194,6 +201,7 @@ def test_build_docker_jq16_binaries(tmp_path):
 
 
 @skip_if_no_docker
+@pytest.mark.long
 def test_build_docker_jq15_binaries(tmp_path):
     import docker
 
@@ -221,6 +229,7 @@ def test_build_docker_jq15_binaries(tmp_path):
 
 
 @skip_if_no_docker
+@pytest.mark.long
 def test_build_docker_jq16_source(tmp_path):
     import docker
 
@@ -245,6 +254,7 @@ def test_build_docker_jq16_source(tmp_path):
 
 
 @skip_if_no_docker
+@pytest.mark.long
 def test_build_docker_jq15_source(tmp_path):
     import docker
 
@@ -269,6 +279,7 @@ def test_build_docker_jq15_source(tmp_path):
 
 
 @skip_if_no_singularity
+@pytest.mark.long
 def test_build_singularity_jq16_binaries(tmp_path):
     _TemplateRegistry._reset()
     _TemplateRegistry.register("jq", _template_filepath)
@@ -309,6 +320,7 @@ def test_build_singularity_jq16_binaries(tmp_path):
 
 
 @skip_if_no_singularity
+@pytest.mark.long
 def test_build_singularity_jq15_binaries(tmp_path):
     _TemplateRegistry._reset()
     _TemplateRegistry.register("jq", _template_filepath)
@@ -349,6 +361,7 @@ def test_build_singularity_jq15_binaries(tmp_path):
 
 
 @skip_if_no_singularity
+@pytest.mark.long
 def test_build_singularity_jq15_source(tmp_path):
     _TemplateRegistry._reset()
     _TemplateRegistry.register("jq", _template_filepath)
