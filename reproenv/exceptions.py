@@ -1,17 +1,29 @@
 """Exceptions for ReproEnv."""
 
 
-class RendererError(Exception):
+class ReproEnvError(Exception):
     pass
 
 
-class RequirementsError(Exception):
+class RendererError(ReproEnvError):
     pass
 
 
-class TemplateError(Exception):
+class RequirementsError(ReproEnvError):
     pass
 
 
-class TemplateNotFound(Exception):
+class TemplateError(ReproEnvError):
+    pass
+
+
+class TemplateKeywordArgumentError(TemplateError):
+    """Invalid keyword argument passed to template, or required argument not
+    provided.
+    """
+
+    pass
+
+
+class TemplateNotFound(ReproEnvError):
     pass

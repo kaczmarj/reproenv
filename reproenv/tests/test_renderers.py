@@ -11,7 +11,6 @@ def test_renderer():
     _Renderer("apt")
     assert _Renderer("yum").users == {"root"}
     assert _Renderer("apt", users={"root", "foo"}).users == {"root", "foo"}
-    assert _Renderer("apt")._templates == {}
 
 
 def test_not_implemented_methods():
@@ -32,3 +31,6 @@ def test_not_implemented_methods():
         r.user("nonroot")
     with pytest.raises(NotImplementedError):
         r.workdir("/opt/")
+
+
+# TODO: add many tests for `indent`.

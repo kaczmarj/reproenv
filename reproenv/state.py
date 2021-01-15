@@ -5,8 +5,6 @@ import json
 import os
 from pathlib import Path
 import typing as ty
-from typing_extensions import Literal
-
 
 import jsonschema
 import yaml
@@ -18,7 +16,9 @@ try:
 except ImportError:
     from yaml import SafeLoader  # type: ignore
 
-from reproenv.exceptions import TemplateError, TemplateNotFound
+from reproenv.exceptions import RendererError
+from reproenv.exceptions import TemplateError
+from reproenv.exceptions import TemplateNotFound
 from reproenv.types import TemplateType
 
 _schemas_path = Path(__file__).parent / "schemas"
@@ -45,26 +45,13 @@ def _validate_template(template: TemplateType):
     # that behavior here, so we can catch errors early.
     pass
 
-    # Check for `self.install_dependencies()` in instructions if dependencies are not
-    # empty.
-    # TODO: this mess happened while trying to enforce types... how can it be made
-    # cleaner?
-    method: Literal["binaries", "source"]
-    methods: ty.Set[Literal["binaries", "source"]] = {"binaries", "source"}
-    for method in methods:
-        if method in template.keys():
-            if "dependencies" in template[method]:
-                has_deps = any(template[method]["dependencies"].values())
-                if (
-                    has_deps
-                    and "self.install_dependencies()"
-                    not in template[method]["instructions"]
-                ):
-                    raise TemplateError(
-                        "Dependencies are defined but never installed in"
-                        f" 'template.{method}.instructions'."
-                        "\nAdd `{{ self.install_dependencies() }}` to instructions."
-                    )
+
+def _validate_renderer(d):
+    """Validate renderer dictionary against JSON schema. Raise exception if invalid."""
+    try:
+        jsonschema.validate(d, schema=_RENDERER_SCHEMA)
+    except jsonschema.exceptions.ValidationError as e:
+        raise RendererError(f"Invalid renderer dictionary: {e.message}.") from e
 
 
 class _TemplateRegistry:
@@ -108,11 +95,33 @@ class _TemplateRegistry:
 
         _validate_template(template)
 
-        # TODO: Add the template name as an optional key to the renderer schema. This is
-        # so that the dictionary passed to the `Renderer().from_dict()` method can
+        # Add the template name as an optional key to the renderer schema. This is
+        # so that the dictionary passed to the `Renderer.from_dict()` method can
         # contain names of registered templates. These templates are not known when the
         # renderer schema is created.
-        pass
+        # However, this schema is lax because the kwds just has to be an object. Keys
+        # and values in kwds are validated in the renderer.
+        key = f"template_{name.replace(' ', '_')}"
+        _RENDERER_SCHEMA["definitions"][key] = {
+            "required": ["name", "kwds"],
+            "properties": {
+                "name": {"enum": [name]},
+                "kwds": {
+                    "type": "object",
+                    # "required": [],
+                    # "properties": {
+                    #     "version": {"type": "string"},
+                    # },
+                    # "additionalProperties": False,
+                },
+            },
+            "additionalProperties": False,
+        }
+        # Do not add template to `instructions` properties if it has already been added.
+        template_ref = {"$ref": f"#/definitions/{key}"}
+        oneof = _RENDERER_SCHEMA["properties"]["instructions"]["items"]["oneOf"]
+        if template_ref not in oneof:
+            oneof.append(template_ref)
 
         # Add template to registry.
         # TODO: should we log a message if overwriting a key-value pair?

@@ -125,24 +125,6 @@ def test_validate_template_invalid_templates():
             }
         )
 
-    # has dependencies but never installs them.
-    with pytest.raises(exceptions.TemplateError, match="defined but never installed"):
-        _validate_template(
-            {
-                "name": "foobar",
-                "binaries": {
-                    "urls": {"1.0.0": "foobar.com"},
-                    "env": {"foo": "bar"},
-                    "instructions": "foobar",
-                    "arguments": {
-                        "required": [],
-                        "optional": [],
-                    },
-                    "dependencies": {"apt": ["curl"], "dpkg": [], "yum": []},
-                },
-            }
-        )
-
     # defines variable but does not indicate if optional or required
     # TODO
 
@@ -232,23 +214,6 @@ def test_validate_template_invalid_templates():
             }
         )
 
-    # has dependencies but never installs them.
-    with pytest.raises(exceptions.TemplateError, match="defined but never installed"):
-        _validate_template(
-            {
-                "name": "foobar",
-                "source": {
-                    "env": {"foo": "bar"},
-                    "instructions": "foobar",
-                    "arguments": {
-                        "required": [],
-                        "optional": [],
-                    },
-                    "dependencies": {"apt": ["curl"], "dpkg": [], "yum": []},
-                },
-            }
-        )
-
     # defines variable but does not indicate if optional or required
     # TODO
 
@@ -282,7 +247,7 @@ def test_validate_template_valid_templates():
                 "env": {"baz": "cat", "boo": "123"},
                 "instructions": "echo hi there\n{{ self.install_dependencies() }}",
                 "arguments": {"required": [], "optional": []},
-                "dependencies": {"apt": ["curl"], "dpkg": ["foo"], "yum": ["curl"]},
+                "dependencies": {"apt": ["curl"], "debs": ["foo"], "yum": ["curl"]},
             },
             "source": {
                 "env": {"foo": "bar"},
@@ -291,7 +256,7 @@ def test_validate_template_valid_templates():
                     "required": [],
                     "optional": [],
                 },
-                "dependencies": {"apt": ["curl"], "dpkg": [], "yum": []},
+                "dependencies": {"apt": ["curl"], "debs": [], "yum": []},
             },
         }
     )
@@ -310,7 +275,7 @@ def test_register(tmp_path: Path):
                 "required": [],
                 "optional": [],
             },
-            "dependencies": {"apt": [], "dpkg": [], "yum": []},
+            "dependencies": {"apt": [], "debs": [], "yum": []},
         },
         "source": {
             "env": {"foo": "bar"},
@@ -319,7 +284,7 @@ def test_register(tmp_path: Path):
                 "required": [],
                 "optional": [],
             },
-            "dependencies": {"apt": [], "dpkg": [], "yum": []},
+            "dependencies": {"apt": [], "debs": [], "yum": []},
         },
     }
 

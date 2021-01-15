@@ -1,53 +1,43 @@
 import pytest
 
-from reproenv.template import BinariesTemplate
+from reproenv.exceptions import RendererError
 from reproenv.renderers import SingularityRenderer
+from reproenv.template import Template
 
 
 def test_singularity_renderer_add_template():
     s = SingularityRenderer("apt")
 
-    # Empty template.
-    with pytest.raises(ValueError):
-        s.add_template({})
-
     d = {
-        "urls": {"1.0.0": "foobar"},
-        "env": {"foo": "bar"},
-        "instructions": "echo hello {{ self.myname }}",
         "name": "foobar",
-        "arguments": {
-            "required": ["myname"],
-            "optional": [],
+        "binaries": {
+            "urls": {"1.0.0": "foobar"},
+            "env": {"foo": "bar"},
+            "instructions": "echo hello {{ self.myname }}",
+            "arguments": {
+                "required": ["myname"],
+                "optional": [],
+            },
+            "dependencies": {"apt": ["curl wget"], "debs": [], "yum": ["python wget"]},
         },
-        "dependencies": {"apt": ["curl wget"], "dpkg": [], "yum": ["python wget"]},
     }
 
-    # Not a BinariesTemplate type.
-    with pytest.raises(ValueError):
-        s.add_template(d)
+    with pytest.raises(
+        RendererError, match="template must be an instance of 'Template' but got"
+    ):
+        s.add_template(d, method="binaries")
+
+    # Invalid method
+    with pytest.raises(
+        RendererError, match="method must be 'binaries', 'source' but got 'fakemethod'"
+    ):
+        s.add_template(Template(d, binaries_kwds=dict(myname="f")), method="fakemethod")
 
     # Test apt.
     s = SingularityRenderer("apt")
-    s.add_template(BinariesTemplate(d, myname="Bjork"))
+    s.add_template(Template(d, binaries_kwds=dict(myname="Bjork")), method="binaries")
     assert (
         str(s)
-        == """\
-
-
-%environment
-export foo="bar"
-
-%post
-apt-get update -qq
-apt-get install -y -q --no-install-recommends \\
-    curl wget
-rm -rf /var/lib/apt/lists/*
-echo hello {{ template_0.myname }}"""
-    )
-
-    assert (
-        s.render()
         == """\
 
 
@@ -63,37 +53,23 @@ echo hello Bjork"""
     )
 
     d = {
-        "urls": {"1.0.0": "foobar"},
-        "env": {"foo": "bar"},
-        "instructions": "echo hello {{ self.myname | default('foo') }}",
-        "name": "foobar",
-        "arguments": {
-            "required": [],
-            "optional": ["myname"],
+        "name": "baz",
+        "binaries": {
+            "urls": {"1.0.0": "foobar"},
+            "env": {"foo": "bar"},
+            "instructions": "echo hello {{ self.myname | default('foo') }}",
+            "arguments": {
+                "required": [],
+                "optional": ["myname"],
+            },
+            "dependencies": {"apt": ["curl wget"], "debs": [], "yum": ["python wget"]},
         },
-        "dependencies": {"apt": ["curl wget"], "dpkg": [], "yum": ["python wget"]},
     }
 
     s = SingularityRenderer("apt")
-    s.add_template(BinariesTemplate(d))
+    s.add_template(Template(d), method="binaries")
     assert (
         str(s)
-        == """\
-
-
-%environment
-export foo="bar"
-
-%post
-apt-get update -qq
-apt-get install -y -q --no-install-recommends \\
-    curl wget
-rm -rf /var/lib/apt/lists/*
-echo hello {{ template_0.myname | default('foo') }}"""
-    )
-
-    assert (
-        s.render()
         == """\
 
 
@@ -114,7 +90,7 @@ def test_singularity_render_from_instance_methods():
     s.from_("alpine")
     s.copy(["foo/bar/baz.txt", "foo/baz/cat.txt"], "/opt/")
     assert (
-        s.render()
+        str(s)
         == """\
 Bootstrap: docker
 From: alpine
@@ -129,7 +105,7 @@ foo/baz/cat.txt /opt/"""
     s.copy(["foo/bar/baz.txt", "foo/baz/cat.txt"], "/opt/")
     s.env(FOO="BAR")
     assert (
-        s.render()
+        str(s)
         == """\
 Bootstrap: docker
 From: alpine
@@ -149,7 +125,7 @@ export FOO="BAR\""""
     s.env(FOO="BAR")
     s.label(ORG="BAZ")
     assert (
-        s.render()
+        str(s)
         == """\
 Bootstrap: docker
 From: alpine
@@ -173,7 +149,7 @@ ORG BAZ"""
     s.label(ORG="BAZ")
     s.run("echo foobar")
     assert (
-        s.render()
+        str(s)
         == """\
 Bootstrap: docker
 From: alpine
@@ -201,7 +177,7 @@ ORG BAZ"""
     s.run("echo foobar")
     s.user("nonroot")
     assert (
-        s.render()
+        str(s)
         == """\
 Bootstrap: docker
 From: alpine
@@ -238,7 +214,7 @@ ORG BAZ"""
     s.user("root")
     s.user("nonroot")
     assert (
-        s.render()
+        str(s)
         == """\
 Bootstrap: docker
 From: alpine

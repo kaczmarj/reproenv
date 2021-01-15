@@ -1,34 +1,41 @@
 import pytest
 
-from reproenv.template import BinariesTemplate
+from reproenv.exceptions import RendererError
 from reproenv.renderers import DockerRenderer
+from reproenv.template import Template
 
 
 def test_docker_renderer_add_template():
     r = DockerRenderer("apt")
 
-    # Empty template.
-    with pytest.raises(ValueError):
-        r.add_template({})
-
     d = {
-        "urls": {"1.0.0": "foobar"},
-        "env": {"foo": "bar"},
-        "instructions": "echo hello\necho world",
         "name": "foobar",
-        "arguments": {
-            "required": [],
-            "optional": [],
+        "binaries": {
+            "urls": {"1.0.0": "foobar"},
+            "env": {"foo": "bar"},
+            "instructions": "echo hello\necho world",
+            "arguments": {
+                "required": [],
+                "optional": [],
+            },
+            "dependencies": {"apt": ["curl"], "debs": [], "yum": ["python"]},
         },
-        "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
     }
 
-    # Not a BinariesTemplate type.
-    with pytest.raises(ValueError):
-        r.add_template(d)
+    # Not a Template type.
+    with pytest.raises(
+        RendererError, match="template must be an instance of 'Template' but got"
+    ):
+        r.add_template(d, method="binaries")
+
+    # Invalid method
+    with pytest.raises(
+        RendererError, match="method must be 'binaries', 'source' but got 'fakemethod"
+    ):
+        r.add_template(Template(d), method="fakemethod")
 
     # Test apt.
-    r.add_template(BinariesTemplate(d))
+    r.add_template(Template(d), method="binaries")
     assert len(r._parts) == 2
     assert r._parts[0] == 'ENV foo="bar"'
     assert (
@@ -43,7 +50,7 @@ def test_docker_renderer_add_template():
 
     # Test yum.
     r = DockerRenderer("yum")
-    r.add_template(BinariesTemplate(d))
+    r.add_template(Template(d), method="binaries")
     assert len(r._parts) == 2
     assert r._parts[0] == 'ENV foo="bar"'
     assert (
@@ -51,36 +58,29 @@ def test_docker_renderer_add_template():
         == """RUN yum install -y -q \\
            python \\
     && yum clean all \\
-       rm -rf /var/cache/yum/* \\
+    && rm -rf /var/cache/yum/* \\
     && echo hello \\
     && echo world"""
     )
 
     # Test required arguments.
     d = {
-        "urls": {"1.0.0": "foobar"},
-        "env": {"foo": "bar"},
-        "instructions": "echo hello {{ self.myname }}",
         "name": "foobar",
-        "arguments": {
-            "required": ["myname"],
-            "optional": [],
+        "binaries": {
+            "urls": {"1.0.0": "foobar"},
+            "env": {"foo": "bar"},
+            "instructions": "echo hello {{ self.name }}",
+            "arguments": {
+                "required": ["name"],
+                "optional": [],
+            },
+            "dependencies": {"apt": ["curl"], "debs": [], "yum": ["python"]},
         },
-        "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
     }
     r = DockerRenderer("apt")
-    r.add_template(BinariesTemplate(d, myname="Bjork"))
+    r.add_template(Template(d, binaries_kwds=dict(name="Bjork")), method="binaries")
     assert (
         str(r)
-        == """ENV foo="bar"
-RUN apt-get update -qq \\
-    && apt-get install -y -q --no-install-recommends \\
-           curl \\
-    && rm -rf /var/lib/apt/lists/* \\
-    && echo hello {{ template_0.myname }}"""
-    )
-    assert (
-        r.render()
         == """ENV foo="bar"
 RUN apt-get update -qq \\
     && apt-get install -y -q --no-install-recommends \\
@@ -90,30 +90,23 @@ RUN apt-get update -qq \\
     )
 
     d = {
-        "urls": {"1.0.0": "foobar"},
-        "env": {"foo": "bar"},
-        "instructions": "echo hello {{ self.myname | default('foo') }}",
         "name": "foobar",
-        "arguments": {
-            "required": [],
-            "optional": ["myname"],
+        "binaries": {
+            "urls": {"1.0.0": "foobar"},
+            "env": {"foo": "bar"},
+            "instructions": "echo hello {{ self.name | default('foo') }}",
+            "arguments": {
+                "required": [],
+                "optional": ["name"],
+            },
+            "dependencies": {"apt": ["curl"], "debs": [], "yum": ["python"]},
         },
-        "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
     }
 
     r = DockerRenderer("apt")
-    r.add_template(BinariesTemplate(d))
+    r.add_template(Template(d), method="binaries")
     assert (
         str(r)
-        == """ENV foo="bar"
-RUN apt-get update -qq \\
-    && apt-get install -y -q --no-install-recommends \\
-           curl \\
-    && rm -rf /var/lib/apt/lists/* \\
-    && echo hello {{ template_0.myname | default('foo') }}"""
-    )
-    assert (
-        r.render()
         == """ENV foo="bar"
 RUN apt-get update -qq \\
     && apt-get install -y -q --no-install-recommends \\
@@ -127,16 +120,16 @@ def test_docker_render_from_instance_methods():
     d = DockerRenderer("apt")
 
     d.from_("alpine")
-    assert d.render() == "FROM alpine"
+    assert str(d) == "FROM alpine"
 
     d = DockerRenderer("apt")
     d.from_("alpine", as_="builder")
-    assert d.render() == "FROM alpine AS builder"
+    assert str(d) == "FROM alpine AS builder"
 
     d = DockerRenderer("apt")
     d.from_("alpine", as_="builder")
     d.arg("FOO")
-    assert d.render() == "FROM alpine AS builder\nARG FOO"
+    assert str(d) == "FROM alpine AS builder\nARG FOO"
 
     d = DockerRenderer("apt")
     d.from_("alpine", as_="builder")
@@ -145,7 +138,7 @@ def test_docker_render_from_instance_methods():
         ["foo/bar/baz.txt", "foo/baz/cat.txt"], "/opt/", from_="builder", chown="neuro"
     )
     assert (
-        d.render()
+        str(d)
         == """\
 FROM alpine AS builder
 ARG FOO
@@ -162,7 +155,7 @@ COPY --from=builder --chown=neuro ["foo/bar/baz.txt", \\
     )
     d.env(PATH="$PATH:/opt/foo/bin")
     assert (
-        d.render()
+        str(d)
         == """\
 FROM alpine AS builder
 ARG FOO
@@ -181,7 +174,7 @@ ENV PATH="$PATH:/opt/foo/bin\""""
     d.env(PATH="$PATH:/opt/foo/bin")
     d.label(ORG="myorg")
     assert (
-        d.render()
+        str(d)
         == """\
 FROM alpine AS builder
 ARG FOO
@@ -202,7 +195,7 @@ LABEL ORG="myorg\""""
     d.label(ORG="myorg")
     d.run("echo foobar")
     assert (
-        d.render()
+        str(d)
         == """\
 FROM alpine AS builder
 ARG FOO
@@ -225,7 +218,7 @@ RUN echo foobar"""
     d.run("echo foobar")
     d.user("nonroot")
     assert (
-        d.render()
+        str(d)
         == """\
 FROM alpine AS builder
 ARG FOO
@@ -252,7 +245,7 @@ USER nonroot"""
     d.user("nonroot")
     d.workdir("/opt/foobar")
     assert (
-        d.render()
+        str(d)
         == """\
 FROM alpine AS builder
 ARG FOO

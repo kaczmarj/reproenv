@@ -21,7 +21,7 @@ class _InstallationDependenciesType(TypedDict, total=False):
     """
 
     apt: ty.List[str]
-    dpkg: ty.List[str]
+    debs: ty.List[str]
     yum: ty.List[str]
 
 
@@ -32,7 +32,7 @@ class _TemplateArgumentsType(TypedDict):
     optional: ty.List[str]
 
 
-class _BaseTemplateType(TypedDict):
+class _BaseTemplateType(TypedDict, total=False):
     """Keys common to both types of templates: binaries and source."""
 
     arguments: _TemplateArgumentsType
@@ -41,13 +41,13 @@ class _BaseTemplateType(TypedDict):
     instructions: str
 
 
-class SourceTemplateType(_BaseTemplateType):
+class _SourceTemplateType(_BaseTemplateType):
     """Template that defines how to install software by source."""
 
     pass
 
 
-class BinariesTemplateType(_BaseTemplateType):
+class _BinariesTemplateType(_BaseTemplateType):
     """Template that defines how to install software from pre-compiled binaries."""
 
     urls: ty.Mapping[str, str]
@@ -59,8 +59,8 @@ class TemplateType(TypedDict, total=False):
     """
 
     name: str
-    binaries: BinariesTemplateType
-    source: SourceTemplateType
+    binaries: _BinariesTemplateType
+    source: _SourceTemplateType
 
 
 class _SingularityHeaderType(TypedDict, total=False):
