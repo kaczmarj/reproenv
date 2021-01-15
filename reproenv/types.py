@@ -21,7 +21,7 @@ class _InstallationDependenciesType(TypedDict, total=False):
     """
 
     apt: ty.List[str]
-    dpkg: ty.List[str]
+    debs: ty.List[str]
     yum: ty.List[str]
 
 
