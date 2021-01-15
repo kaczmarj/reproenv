@@ -10,7 +10,6 @@ from reproenv.state import _validate_template
 from reproenv.types import _BinariesTemplateType
 from reproenv.types import _SourceTemplateType
 from reproenv.types import TemplateType
-from reproenv.types import pkg_managers_type
 
 
 class Template:
@@ -188,9 +187,7 @@ class _BaseInstallationTemplate:
     def versions(self) -> ty.Set[str]:
         raise NotImplementedError()
 
-    def dependencies(
-        self, pkg_manager: ty.Union[pkg_managers_type, ty.Literal["debs"]]
-    ) -> ty.List[str]:
+    def dependencies(self, pkg_manager: str) -> ty.List[str]:
         deps_dict = self._template.get("dependencies", {})
         # TODO: not sure why the following line raises a type error in mypy.
         return deps_dict.get(pkg_manager, [])  # type: ignore
