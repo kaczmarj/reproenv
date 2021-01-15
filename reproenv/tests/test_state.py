@@ -288,14 +288,30 @@ def test_register(tmp_path: Path):
         },
     }
 
+    # incorrect template type
     with pytest.raises(ValueError):
-        _TemplateRegistry.register("foobar", path_or_template="")
+        _TemplateRegistry.register(path_or_template="", name="foobar")
+    # empty template
+    with pytest.raises(exceptions.TemplateError):
+        _TemplateRegistry.register(path_or_template={}, name="foobar")
 
-    _TemplateRegistry.register("foobar", _one_test_template)
-    assert _TemplateRegistry._templates["foobar"] == _one_test_template
-    assert not _TemplateRegistry._templates["foobar"] is _one_test_template
-    assert _TemplateRegistry.get("foobar") == _one_test_template
-    assert _TemplateRegistry.get("FOOBAR") == _one_test_template
+    # omit name
+    with pytest.raises(ValueError):
+        _TemplateRegistry.register(_one_test_template, name=None)
+    with pytest.raises(ValueError):
+        _TemplateRegistry.register(_one_test_template, name=None)
+
+    # register using custom name
+    name: str = "customname"
+    _TemplateRegistry._reset()
+    _TemplateRegistry.register(_one_test_template, name=name)
+    assert _TemplateRegistry._templates[name] == _one_test_template
+    assert not _TemplateRegistry._templates[name] is _one_test_template
+    assert _TemplateRegistry.get(name) == _one_test_template
+    assert _TemplateRegistry.get(name.upper()) == _one_test_template
+    with pytest.raises(exceptions.TemplateNotFound):
+        _TemplateRegistry.get(_one_test_template["name"])
+
     with pytest.raises(exceptions.TemplateNotFound):
         _TemplateRegistry.get("baz")
 
@@ -303,8 +319,25 @@ def test_register(tmp_path: Path):
     with yaml_path.open("w") as f:
         yaml.dump(_one_test_template, f)
 
-    _TemplateRegistry.register("foobar_yaml", path_or_template=yaml_path)
-    assert _TemplateRegistry.get("foobar_yaml") == _one_test_template
+    # register using name defined in template
+    name = _one_test_template["name"]
+    _TemplateRegistry._reset()
+    _TemplateRegistry.register(yaml_path)
+    assert _TemplateRegistry._templates[name] == _one_test_template
+    assert not _TemplateRegistry._templates[name] is _one_test_template
+    assert _TemplateRegistry.get(name) == _one_test_template
+    assert _TemplateRegistry.get(name.upper()) == _one_test_template
+
+    # register using custom name
+    name = "customfoobar"
+    _TemplateRegistry._reset()
+    _TemplateRegistry.register(yaml_path, name=name)
+    assert _TemplateRegistry._templates[name] == _one_test_template
+    assert not _TemplateRegistry._templates[name] is _one_test_template
+    assert _TemplateRegistry.get(name) == _one_test_template
+    assert _TemplateRegistry.get(name.upper()) == _one_test_template
+    with pytest.raises(exceptions.TemplateNotFound):
+        _TemplateRegistry.get(_one_test_template["name"])
 
 
 def test_get():

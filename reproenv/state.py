@@ -66,7 +66,9 @@ class _TemplateRegistry:
 
     @classmethod
     def register(
-        cls, name: str, path_or_template: ty.Union[str, os.PathLike, TemplateType]
+        cls,
+        path_or_template: ty.Union[str, os.PathLike, TemplateType],
+        name: str = None,
     ):
         """Register a template. This will overwrite an existing template with the
         same name in the registry.
@@ -76,15 +78,19 @@ class _TemplateRegistry:
 
         Parameters
         ----------
-        name : str
-            Name of the template. This becomes the key to the template in the registry.
-            The name is made lower-case.
         path_or_template : str, Path-like, or TemplateType
             Path to YAML file that defines the template, or the dictionary that
             represents the template.
+        name : str
+            Name of the template. This becomes the key to the template in the registry.
+            The name is made lower-case. If `path_or_template` is a path, then `name`
+            can be omitted and instead comes from `template["name"]`. If
+            `path_or_template` is a `dict`, then `name` is required.
         """
-        name = str(name)
         if isinstance(path_or_template, dict):
+            if name is None:
+                raise ValueError("`name` required when template is not a file")
+            name = str(name)
             template = copy.deepcopy(path_or_template)
         else:
             path_or_template = Path(path_or_template)
@@ -94,6 +100,8 @@ class _TemplateRegistry:
                 template = yaml.load(f, Loader=SafeLoader)
 
         _validate_template(template)
+        if name is None:
+            name = str(template["name"])
 
         # Add the template name as an optional key to the renderer schema. This is
         # so that the dictionary passed to the `Renderer.from_dict()` method can
@@ -108,11 +116,6 @@ class _TemplateRegistry:
                 "name": {"enum": [name]},
                 "kwds": {
                     "type": "object",
-                    # "required": [],
-                    # "properties": {
-                    #     "version": {"type": "string"},
-                    # },
-                    # "additionalProperties": False,
                 },
             },
             "additionalProperties": False,
