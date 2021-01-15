@@ -10,7 +10,6 @@ from reproenv.state import _validate_template
 from reproenv.types import _BinariesTemplateType
 from reproenv.types import _SourceTemplateType
 from reproenv.types import TemplateType
-from reproenv.types import allowed_pkg_managers
 from reproenv.types import pkg_managers_type
 
 
@@ -99,30 +98,22 @@ class _BaseInstallationTemplate:
     ) -> None:
         self._template = copy.deepcopy(template)
         # User-defined arguments that are passed to template at render time.
-        for key in kwds.keys():
-            if not isinstance(kwds[key], str):
-                kwds[key] = str(kwds[key])
+        for key, value in kwds.items():
+            if not isinstance(value, str):
+                kwds[key] = str(value)
         self._kwds = kwds
 
-        self._validate_kwds()
+        # We cannot validate kwds immediately... The Renderer should not validate
+        # immediately. It should validate only the installation method being used.
         self._set_kwds_as_attrs()
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self._template}, **{self._kwds})"
 
-    def _validate_kwds(self):
+    def validate_kwds(self):
         """Raise `TemplateKeywordArgumentError` if keyword arguments to template are
         invalid.
         """
-        # Check that keywords do not shadow attributes of this object.
-        shadowed = set(self._kwds).intersection(dir(self))
-        if shadowed:
-            raise TemplateKeywordArgumentError(
-                "Invalid keyword arguments: '{}'. If these keywords are used by the"
-                " template, then the template must be modified to use different"
-                " keywords.".format("', '".join(shadowed))
-            )
-
         # Check that all required keywords were provided by user.
         req_keys_not_found = self.required_arguments.difference(self._kwds)
         if req_keys_not_found:
@@ -156,7 +147,14 @@ class _BaseInstallationTemplate:
                 )
 
     def _set_kwds_as_attrs(self):
-        # we check if keywords will shadow object's methods in `self._validate_kwds()`.
+        # Check that keywords do not shadow attributes of this object.
+        shadowed = set(self._kwds).intersection(dir(self))
+        if shadowed:
+            raise TemplateKeywordArgumentError(
+                "Invalid keyword arguments: '{}'. If these keywords are used by the"
+                " template, then the template must be modified to use different"
+                " keywords.".format("', '".join(shadowed))
+            )
         for k, v in self._kwds.items():
             setattr(self, k, v)
 
@@ -190,15 +188,12 @@ class _BaseInstallationTemplate:
     def versions(self) -> ty.Set[str]:
         raise NotImplementedError()
 
-    def dependencies(self, pkg_manager: pkg_managers_type) -> ty.List[str]:
-        if pkg_manager not in allowed_pkg_managers:
-            raise ValueError(
-                f"invalid package manager: '{pkg_manager}'. valid options are"
-                f" {', '.join(allowed_pkg_managers)}."
-            )
-        deps = self._template.get("dependencies", {})
+    def dependencies(
+        self, pkg_manager: ty.Union[pkg_managers_type, ty.Literal["debs"]]
+    ) -> ty.List[str]:
+        deps_dict = self._template.get("dependencies", {})
         # TODO: not sure why the following line raises a type error in mypy.
-        return deps.get(pkg_manager, [])  # type: ignore
+        return deps_dict.get(pkg_manager, [])  # type: ignore
 
 
 class _BinariesTemplate(_BaseInstallationTemplate):
