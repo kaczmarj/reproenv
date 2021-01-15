@@ -13,7 +13,7 @@ def test_template():
             "env": {"baz": "cat", "boo": "123"},
             "instructions": "echo hi there\n{{ self.baz }}",
             "arguments": {"required": ["baz"], "optional": []},
-            "dependencies": {"apt": ["curl"], "dpkg": ["foo"], "yum": ["curl"]},
+            "dependencies": {"apt": ["curl"], "debs": ["foo"], "yum": ["curl"]},
         },
         "source": {
             "env": {"foo": "bar"},
@@ -22,21 +22,32 @@ def test_template():
                 "required": [],
                 "optional": ["boo"],
             },
-            "dependencies": {"apt": ["curl"], "dpkg": [], "yum": []},
+            "dependencies": {"apt": ["curl"], "debs": [], "yum": []},
         },
     }
     # do not provide required kwds
     with pytest.raises(exceptions.TemplateKeywordArgumentError):
-        template.Template(d)
+        template.Template(d).binaries.validate_kwds()
+    # this is fine because source only has optional args
+    template.Template(d).source.validate_kwds()
     # only provide optional kwd to source
     with pytest.raises(exceptions.TemplateKeywordArgumentError):
-        template.Template(d, source_kwds=dict(boo="cat"))
+        template.Template(d, source_kwds=dict(boo="cat")).binaries.validate_kwds()
+    # this is fine
+    template.Template(d, source_kwds=dict(boo="cat")).source.validate_kwds()
     # provide unknown kwd
     with pytest.raises(exceptions.TemplateKeywordArgumentError):
-        template.Template(d, source_kwds=dict(boop="cat"))
+        template.Template(d, source_kwds=dict(boop="cat")).source.validate_kwds()
     # provide empty dict
     with pytest.raises(exceptions.TemplateKeywordArgumentError):
-        template.Template(d, binaries_kwds={}, source_kwds=dict(boop="cat"))
+        template.Template(
+            d, binaries_kwds={}, source_kwds=dict(boop="cat")
+        ).binaries.validate_kwds()
+    # this is also bad
+    with pytest.raises(exceptions.TemplateKeywordArgumentError):
+        template.Template(
+            d, binaries_kwds={}, source_kwds=dict(boop="cat")
+        ).source.validate_kwds()
 
     # provide all kwds
     t = template.Template(d, binaries_kwds=dict(baz=1234), source_kwds=dict(boo="cat"))
@@ -57,12 +68,13 @@ def test_template():
                 "env": {"baz": "cat", "boo": "123"},
                 "instructions": "echo hi there\n{{ self.baz }}",
                 "arguments": {"required": ["baz"], "optional": []},
-                "dependencies": {"apt": ["curl"], "dpkg": ["foo"], "yum": ["curl"]},
+                "dependencies": {"apt": ["curl"], "debs": ["foo"], "yum": ["curl"]},
             },
         },
         binaries_kwds=dict(baz="1234"),
     )
     assert t.source is None
+    t.binaries.validate_kwds()
 
     t = template.Template(
         {
@@ -74,12 +86,13 @@ def test_template():
                     "required": [],
                     "optional": ["boo"],
                 },
-                "dependencies": {"apt": ["curl"], "dpkg": [], "yum": []},
+                "dependencies": {"apt": ["curl"], "debs": [], "yum": []},
             },
         },
         source_kwds=dict(boo="baz"),
     )
     assert t.binaries is None
+    t.source.validate_kwds()
 
     # invalid template, but otherwise ok
     with pytest.raises(exceptions.TemplateError):
@@ -113,8 +126,7 @@ def test_installation_template_base():
     assert it.required_arguments == set()
     assert it.optional_arguments == set()
     assert it.dependencies("apt") == []
-    with pytest.raises(ValueError):
-        it.dependencies("foobar")
+    assert it.dependencies("foobar") == []
 
     d: types.BinariesTemplateType = {
         "urls": {"1.0.0": "foobar"},
@@ -128,18 +140,18 @@ def test_installation_template_base():
 
     # missing required key
     with pytest.raises(exceptions.TemplateError, match="Missing required arguments"):
-        template._BaseInstallationTemplate(d)
+        template._BaseInstallationTemplate(d).validate_kwds()
 
     # bad key
     with pytest.raises(
         exceptions.TemplateError,
         match="Keyword argument provided is not specified in template",
     ):
-        template._BaseInstallationTemplate(d, name="foo", unknown="val")
+        template._BaseInstallationTemplate(d, name="foo", unknown="val").validate_kwds()
 
     # optional key provided only
     with pytest.raises(exceptions.TemplateError, match="Missing required arguments"):
-        template._BaseInstallationTemplate(d, age="42")
+        template._BaseInstallationTemplate(d, age="42").validate_kwds()
 
     # versions
     d["arguments"]["required"] += ["version"]
@@ -150,7 +162,7 @@ def test_installation_template_base():
     assert it.age == "42"
     # invalid version - not found in urls
     with pytest.raises(exceptions.TemplateError):
-        template._BinariesTemplate(d, version="2.0.0")
+        template._BinariesTemplate(d, version="2.0.0").validate_kwds()
 
     #
     # Source template
@@ -181,8 +193,7 @@ def test_installation_template_base():
     assert it.dependencies("apt") == d["dependencies"]["apt"]
     # TODO: add dpkg
     assert it.dependencies("yum") == d["dependencies"]["yum"]
-    with pytest.raises(ValueError):
-        it.dependencies("foobar")
+    assert it.dependencies("foobar") == []
     assert it._kwds == {"name": "foobar", "age": "42", "height": "100"}
     assert it.name == "foobar"
     assert it.age == "42"

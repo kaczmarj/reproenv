@@ -18,7 +18,7 @@ def test_singularity_renderer_add_template():
                 "required": ["myname"],
                 "optional": [],
             },
-            "dependencies": {"apt": ["curl wget"], "dpkg": [], "yum": ["python wget"]},
+            "dependencies": {"apt": ["curl wget"], "debs": [], "yum": ["python wget"]},
         },
     }
 
@@ -49,22 +49,6 @@ apt-get update -qq
 apt-get install -y -q --no-install-recommends \\
     curl wget
 rm -rf /var/lib/apt/lists/*
-echo hello {{ template_0.template.binaries.myname }}"""
-    )
-
-    assert (
-        s.render()
-        == """\
-
-
-%environment
-export foo="bar"
-
-%post
-apt-get update -qq
-apt-get install -y -q --no-install-recommends \\
-    curl wget
-rm -rf /var/lib/apt/lists/*
 echo hello Bjork"""
     )
 
@@ -78,7 +62,7 @@ echo hello Bjork"""
                 "required": [],
                 "optional": ["myname"],
             },
-            "dependencies": {"apt": ["curl wget"], "dpkg": [], "yum": ["python wget"]},
+            "dependencies": {"apt": ["curl wget"], "debs": [], "yum": ["python wget"]},
         },
     }
 
@@ -86,22 +70,6 @@ echo hello Bjork"""
     s.add_template(Template(d), method="binaries")
     assert (
         str(s)
-        == """\
-
-
-%environment
-export foo="bar"
-
-%post
-apt-get update -qq
-apt-get install -y -q --no-install-recommends \\
-    curl wget
-rm -rf /var/lib/apt/lists/*
-echo hello {{ template_0.template.binaries.myname | default('foo') }}"""
-    )
-
-    assert (
-        s.render()
         == """\
 
 
@@ -122,7 +90,7 @@ def test_singularity_render_from_instance_methods():
     s.from_("alpine")
     s.copy(["foo/bar/baz.txt", "foo/baz/cat.txt"], "/opt/")
     assert (
-        s.render()
+        str(s)
         == """\
 Bootstrap: docker
 From: alpine
@@ -137,7 +105,7 @@ foo/baz/cat.txt /opt/"""
     s.copy(["foo/bar/baz.txt", "foo/baz/cat.txt"], "/opt/")
     s.env(FOO="BAR")
     assert (
-        s.render()
+        str(s)
         == """\
 Bootstrap: docker
 From: alpine
@@ -157,7 +125,7 @@ export FOO="BAR\""""
     s.env(FOO="BAR")
     s.label(ORG="BAZ")
     assert (
-        s.render()
+        str(s)
         == """\
 Bootstrap: docker
 From: alpine
@@ -181,7 +149,7 @@ ORG BAZ"""
     s.label(ORG="BAZ")
     s.run("echo foobar")
     assert (
-        s.render()
+        str(s)
         == """\
 Bootstrap: docker
 From: alpine
@@ -209,7 +177,7 @@ ORG BAZ"""
     s.run("echo foobar")
     s.user("nonroot")
     assert (
-        s.render()
+        str(s)
         == """\
 Bootstrap: docker
 From: alpine
@@ -246,7 +214,7 @@ ORG BAZ"""
     s.user("root")
     s.user("nonroot")
     assert (
-        s.render()
+        str(s)
         == """\
 Bootstrap: docker
 From: alpine

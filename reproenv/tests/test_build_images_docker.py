@@ -26,7 +26,7 @@ def test_build_a(tmp_path):
     with (tmp_path / "tst" / "baz.txt").open("w"):
         pass
     # Write Dockerfile.
-    (tmp_path / "Dockerfile").write_text(d.render())
+    (tmp_path / "Dockerfile").write_text(str(d))
     image = client.images.build(path=str(tmp_path), tag="test", rm=True)
     # This is a tuple...
     image = image[0]

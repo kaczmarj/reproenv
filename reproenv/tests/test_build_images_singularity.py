@@ -25,7 +25,7 @@ def test_build_a(tmp_path):
     # Write Singularity recipe.
     sing_path = tmp_path / "Singularity"
     sif_path = tmp_path / "test.sif"
-    sing_path.write_text(d.render())
+    sing_path.write_text(str(d))
     subprocess.run(
         f"sudo singularity build {sif_path} {sing_path}".split(),
         check=True,

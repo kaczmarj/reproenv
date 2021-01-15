@@ -247,7 +247,7 @@ def test_validate_template_valid_templates():
                 "env": {"baz": "cat", "boo": "123"},
                 "instructions": "echo hi there\n{{ self.install_dependencies() }}",
                 "arguments": {"required": [], "optional": []},
-                "dependencies": {"apt": ["curl"], "dpkg": ["foo"], "yum": ["curl"]},
+                "dependencies": {"apt": ["curl"], "debs": ["foo"], "yum": ["curl"]},
             },
             "source": {
                 "env": {"foo": "bar"},
@@ -256,7 +256,7 @@ def test_validate_template_valid_templates():
                     "required": [],
                     "optional": [],
                 },
-                "dependencies": {"apt": ["curl"], "dpkg": [], "yum": []},
+                "dependencies": {"apt": ["curl"], "debs": [], "yum": []},
             },
         }
     )
@@ -275,7 +275,7 @@ def test_register(tmp_path: Path):
                 "required": [],
                 "optional": [],
             },
-            "dependencies": {"apt": [], "dpkg": [], "yum": []},
+            "dependencies": {"apt": [], "debs": [], "yum": []},
         },
         "source": {
             "env": {"foo": "bar"},
@@ -284,7 +284,7 @@ def test_register(tmp_path: Path):
                 "required": [],
                 "optional": [],
             },
-            "dependencies": {"apt": [], "dpkg": [], "yum": []},
+            "dependencies": {"apt": [], "debs": [], "yum": []},
         },
     }
 

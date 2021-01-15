@@ -1,5 +1,6 @@
-# TODO: test `from_dict` methods too.
+# TODO: add more tests for `from_dict` method.
 
+from pathlib import Path
 import subprocess
 
 from reproenv.renderers import DockerRenderer
@@ -8,167 +9,92 @@ from reproenv.state import _TemplateRegistry
 from reproenv.tests.utils import skip_if_no_docker
 from reproenv.tests.utils import skip_if_no_singularity
 
-d = {
-    "name": "testing",
-    "binaries": {
-        "arguments": {"required": ["version"]},
-        "instructions": """\
-curl -fsSL --output /usr/local/bin/jq {{ self.urls[self.version]}}
-chmod +x /usr/local/bin/jq
-""",
-        "urls": {
-            "1.6": "https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64",
-            "1.5": "https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64",
-        },
-        "env": {"ND_FOO": "BAR", "ND_BAZ": "1234"},
-        "dependencies": {
-            "apt": ["ca-certificates", "curl"],
-            # To test that dpkg installations work
-            "dpkg": [
-                "http://ftp.us.debian.org/debian/pool/main/r/rust-fd-find/fd-find_7.2.0-2_amd64.deb"  # noqa: E501
-            ],
-            "yum": ["curl", "fd-find"],
-        },
-    },
-    "source": {
-        "arguments": {"required": ["version"]},
-        "instructions": """\
-mkdir jq
-cd jq
-curl -fsSL https://github.com/stedolan/jq/releases/download/jq-{{self.version}}/jq-{{self.version}}.tar.gz \\
-| tar xz --strip-components 1
-autoreconf -fi
-./configure --disable-maintainer-mode
-make
-make install
-""",
-        "env": {"ND_FOO": "BAR", "ND_BAZ": "1234"},
-        "dependencies": {
-            "apt": [
-                "ca-certificates",
-                "curl",
-                "automake",
-                "gcc",
-                "git",
-                "libtool",
-                "make",
-            ],
-            "yum": [
-                "ca-certificates",
-                "curl",
-                "automake",
-                "gcc",
-                "git",
-                "libtool",
-                "make",
-            ],
-        },
-    },
-}
+_template_filepath = Path(__file__).parent / "sample-template-jq.yaml"
 
 
 @skip_if_no_docker
-def test_build_docker_jq16_binaries(tmp_path):
+def test_build_docker_from_dict_apt(tmp_path):
     import docker
 
     client = docker.from_env()
 
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", d)
+    _TemplateRegistry.register("jq", _template_filepath)
 
-    r = DockerRenderer(pkg_manager="apt")
-    r.from_("debian:buster-slim")
-    r.add_registered_template("jq", method="binaries", version="1.6")
-
+    d = {
+        "pkg_manager": "apt",
+        "instructions": [
+            {"name": "from_", "kwds": {"base_image": "debian:stretch"}},
+            {"name": "run", "kwds": {"command": "echo hello there"}},
+            {"name": "jq", "kwds": {"version": "1.6", "method": "binaries"}},
+        ],
+    }
+    r = DockerRenderer.from_dict(d)
     # Write Dockerfile.
-    (tmp_path / "Dockerfile").write_text(r.render())
+    (tmp_path / "Dockerfile").write_text(str(r))
     image = client.images.build(path=str(tmp_path), tag="jq", rm=True)
     # This is a tuple...
     image = image[0]
     stdout = client.containers.run(image=image, command="jq --help")
     assert stdout.decode().strip().startswith("jq - commandline JSON processor")
+    stdout = client.containers.run(image=image, command="jq --version")
+    assert stdout.decode().strip() == "jq-1.6"
+    # Test that deb was installed
+    stdout = client.containers.run(image=image, command="fdfind --help")
+    assert stdout.decode().strip().startswith("fd 7.2.0")
 
 
 @skip_if_no_docker
-def test_build_docker_jq15_binaries(tmp_path):
+def test_build_docker_from_dict_yum(tmp_path):
     import docker
 
     client = docker.from_env()
 
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", d)
+    _TemplateRegistry.register("jq", _template_filepath)
 
-    r = DockerRenderer(pkg_manager="apt")
-    r.from_("debian:buster-slim")
-    r.add_registered_template("jq", method="binaries", version="1.5")
-
+    d = {
+        "pkg_manager": "yum",
+        "instructions": [
+            {"name": "from_", "kwds": {"base_image": "fedora:33"}},
+            {"name": "run", "kwds": {"command": "echo hello there"}},
+            {"name": "jq", "kwds": {"version": "1.6", "method": "binaries"}},
+        ],
+    }
+    r = DockerRenderer.from_dict(d)
     # Write Dockerfile.
-    (tmp_path / "Dockerfile").write_text(r.render())
+    (tmp_path / "Dockerfile").write_text(str(r))
     image = client.images.build(path=str(tmp_path), tag="jq", rm=True)
     # This is a tuple...
     image = image[0]
     stdout = client.containers.run(image=image, command="jq --help")
     assert stdout.decode().strip().startswith("jq - commandline JSON processor")
-
-
-@skip_if_no_docker
-def test_build_docker_jq16_source(tmp_path):
-    import docker
-
-    client = docker.from_env()
-
-    _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", d)
-
-    r = DockerRenderer(pkg_manager="apt")
-    r.from_("debian:buster-slim")
-    r.add_registered_template("jq", method="source", version="1.6")
-
-    # Write Dockerfile.
-    (tmp_path / "Dockerfile").write_text(r.render())
-    image = client.images.build(path=str(tmp_path), tag="jq", rm=True)
-    # This is a tuple...
-    image = image[0]
-    stdout = client.containers.run(image=image, command="jq --help")
-    assert stdout.decode().strip().startswith("jq - commandline JSON processor")
-
-
-@skip_if_no_docker
-def test_build_docker_jq15_source(tmp_path):
-    import docker
-
-    client = docker.from_env()
-
-    _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", d)
-
-    r = DockerRenderer(pkg_manager="apt")
-    r.from_("debian:buster-slim")
-    r.add_registered_template("jq", method="source", version="1.5")
-
-    # Write Dockerfile.
-    (tmp_path / "Dockerfile").write_text(r.render())
-    image = client.images.build(path=str(tmp_path), tag="jq", rm=True)
-    # This is a tuple...
-    image = image[0]
-    stdout = client.containers.run(image=image, command="jq --help")
-    assert stdout.decode().strip().startswith("jq - commandline JSON processor")
+    stdout = client.containers.run(image=image, command="jq --version")
+    assert stdout.decode().strip() == "jq-1.6"
+    stdout = client.containers.run(image=image, command="fd --help")
+    assert stdout.decode().strip().startswith("fd")
 
 
 @skip_if_no_singularity
-def test_build_singularity_jq16_binaries(tmp_path):
+def test_build_singularity_from_dict_apt(tmp_path):
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", d)
+    _TemplateRegistry.register("jq", _template_filepath)
 
+    d = {
+        "pkg_manager": "apt",
+        "instructions": [
+            {"name": "from_", "kwds": {"base_image": "debian:stretch"}},
+            {"name": "run", "kwds": {"command": "echo hello there"}},
+            {"name": "jq", "kwds": {"version": "1.6", "method": "binaries"}},
+        ],
+    }
     # Create a Singularity recipe.
-    r = SingularityRenderer(pkg_manager="apt")
-    r.from_("debian:buster-slim")
-    r.add_registered_template("jq", method="binaries", version="1.6")
+    r = SingularityRenderer.from_dict(d)
 
     # Write Singularity recipe.
     sing_path = tmp_path / "Singularity"
     sif_path = tmp_path / "jq-test.sif"
-    sing_path.write_text(r.render())
+    sing_path.write_text(str(r))
     subprocess.run(
         f"sudo singularity build {sif_path} {sing_path}".split(),
         check=True,
@@ -180,3 +106,276 @@ def test_build_singularity_jq16_binaries(tmp_path):
     assert (
         completed.stdout.decode().strip().startswith("jq - commandline JSON processor")
     )
+    completed = subprocess.run(
+        f"singularity run {sif_path} jq --version".split(),
+        capture_output=True,
+        check=True,
+    )
+    assert completed.stdout.decode().strip() == "jq-1.6"
+    # Test that deb was installed
+    completed = subprocess.run(
+        f"singularity run {sif_path} fdfind --version".split(),
+        capture_output=True,
+        check=True,
+    )
+    assert completed.stdout.decode().strip() == "fd 7.2.0"
+
+
+@skip_if_no_singularity
+def test_build_singularity_from_dict_yum(tmp_path):
+    _TemplateRegistry._reset()
+    _TemplateRegistry.register("jq", _template_filepath)
+
+    d = {
+        "pkg_manager": "yum",
+        "instructions": [
+            {"name": "from_", "kwds": {"base_image": "fedora:33"}},
+            {"name": "run", "kwds": {"command": "echo hello there"}},
+            {"name": "jq", "kwds": {"version": "1.6", "method": "binaries"}},
+        ],
+    }
+    # Create a Singularity recipe.
+    r = SingularityRenderer.from_dict(d)
+
+    # Write Singularity recipe.
+    sing_path = tmp_path / "Singularity"
+    sif_path = tmp_path / "jq-test.sif"
+    sing_path.write_text(str(r))
+    subprocess.run(
+        f"sudo singularity build {sif_path} {sing_path}".split(),
+        check=True,
+        cwd=tmp_path,
+    )
+    completed = subprocess.run(
+        f"singularity run {sif_path} jq --help".split(), capture_output=True, check=True
+    )
+    assert (
+        completed.stdout.decode().strip().startswith("jq - commandline JSON processor")
+    )
+    completed = subprocess.run(
+        f"singularity run {sif_path} jq --version".split(),
+        capture_output=True,
+        check=True,
+    )
+    assert completed.stdout.decode().strip() == "jq-1.6"
+    completed = subprocess.run(
+        f"singularity run {sif_path} fd --help".split(),
+        capture_output=True,
+        check=True,
+    )
+    assert completed.stdout.decode().strip().startswith("fd")
+
+
+@skip_if_no_docker
+def test_build_docker_jq16_binaries(tmp_path):
+    import docker
+
+    client = docker.from_env()
+
+    _TemplateRegistry._reset()
+    _TemplateRegistry.register("jq", _template_filepath)
+
+    r = DockerRenderer(pkg_manager="apt")
+    r.from_("debian:buster-slim")
+    r.add_registered_template("jq", method="binaries", version="1.6")
+
+    # Write Dockerfile.
+    (tmp_path / "Dockerfile").write_text(str(r))
+    image = client.images.build(path=str(tmp_path), tag="jq", rm=True)
+    # This is a tuple...
+    image = image[0]
+    stdout = client.containers.run(image=image, command="jq --help")
+    assert stdout.decode().strip().startswith("jq - commandline JSON processor")
+    stdout = client.containers.run(image=image, command="jq --version")
+    assert stdout.decode().strip() == "jq-1.6"
+    # Test that deb was installed
+    stdout = client.containers.run(image=image, command="fdfind --help")
+    assert stdout.decode().strip().startswith("fd 7.2.0")
+
+
+@skip_if_no_docker
+def test_build_docker_jq15_binaries(tmp_path):
+    import docker
+
+    client = docker.from_env()
+
+    _TemplateRegistry._reset()
+    _TemplateRegistry.register("jq", _template_filepath)
+
+    r = DockerRenderer(pkg_manager="apt")
+    r.from_("debian:buster-slim")
+    r.add_registered_template("jq", method="binaries", version="1.5")
+
+    # Write Dockerfile.
+    (tmp_path / "Dockerfile").write_text(str(r))
+    image = client.images.build(path=str(tmp_path), tag="jq", rm=True)
+    # This is a tuple...
+    image = image[0]
+    stdout = client.containers.run(image=image, command="jq --help")
+    assert stdout.decode().strip().startswith("jq - commandline JSON processor")
+    stdout = client.containers.run(image=image, command="jq --version")
+    assert stdout.decode().strip() == "jq-1.5"
+    # Test that deb was installed
+    stdout = client.containers.run(image=image, command="fdfind --help")
+    assert stdout.decode().strip().startswith("fd 7.2.0")
+
+
+@skip_if_no_docker
+def test_build_docker_jq16_source(tmp_path):
+    import docker
+
+    client = docker.from_env()
+
+    _TemplateRegistry._reset()
+    _TemplateRegistry.register("jq", _template_filepath)
+
+    r = DockerRenderer(pkg_manager="apt")
+    r.from_("debian:buster-slim")
+    r.add_registered_template("jq", method="source", version="1.6")
+
+    # Write Dockerfile.
+    (tmp_path / "Dockerfile").write_text(str(r))
+    image = client.images.build(path=str(tmp_path), tag="jq", rm=True)
+    # This is a tuple...
+    image = image[0]
+    stdout = client.containers.run(image=image, command="jq --help")
+    assert stdout.decode().strip().startswith("jq - commandline JSON processor")
+    stdout = client.containers.run(image=image, command="jq --version")
+    assert stdout.decode().strip() == "jq-1.6"
+
+
+@skip_if_no_docker
+def test_build_docker_jq15_source(tmp_path):
+    import docker
+
+    client = docker.from_env()
+
+    _TemplateRegistry._reset()
+    _TemplateRegistry.register("jq", _template_filepath)
+
+    r = DockerRenderer(pkg_manager="apt")
+    r.from_("debian:buster-slim")
+    r.add_registered_template("jq", method="source", version="1.5")
+
+    # Write Dockerfile.
+    (tmp_path / "Dockerfile").write_text(str(r))
+    image = client.images.build(path=str(tmp_path), tag="jq", rm=True)
+    # This is a tuple...
+    image = image[0]
+    stdout = client.containers.run(image=image, command="jq --help")
+    assert stdout.decode().strip().startswith("jq - commandline JSON processor")
+    stdout = client.containers.run(image=image, command="jq --version")
+    assert stdout.decode().strip() == "jq-"  # this is what jq shows
+
+
+@skip_if_no_singularity
+def test_build_singularity_jq16_binaries(tmp_path):
+    _TemplateRegistry._reset()
+    _TemplateRegistry.register("jq", _template_filepath)
+
+    # Create a Singularity recipe.
+    r = SingularityRenderer(pkg_manager="apt")
+    r.from_("debian:buster-slim")
+    r.add_registered_template("jq", method="binaries", version="1.6")
+
+    # Write Singularity recipe.
+    sing_path = tmp_path / "Singularity"
+    sif_path = tmp_path / "jq-test.sif"
+    sing_path.write_text(str(r))
+    subprocess.run(
+        f"sudo singularity build {sif_path} {sing_path}".split(),
+        check=True,
+        cwd=tmp_path,
+    )
+    completed = subprocess.run(
+        f"singularity run {sif_path} jq --help".split(), capture_output=True, check=True
+    )
+    assert (
+        completed.stdout.decode().strip().startswith("jq - commandline JSON processor")
+    )
+    completed = subprocess.run(
+        f"singularity run {sif_path} jq --version".split(),
+        capture_output=True,
+        check=True,
+    )
+    assert completed.stdout.decode().strip() == "jq-1.6"
+    # Test that deb was installed
+    completed = subprocess.run(
+        f"singularity run {sif_path} fdfind --version".split(),
+        capture_output=True,
+        check=True,
+    )
+    assert completed.stdout.decode().strip() == "fd 7.2.0"
+
+
+@skip_if_no_singularity
+def test_build_singularity_jq15_binaries(tmp_path):
+    _TemplateRegistry._reset()
+    _TemplateRegistry.register("jq", _template_filepath)
+
+    # Create a Singularity recipe.
+    r = SingularityRenderer(pkg_manager="apt")
+    r.from_("debian:buster-slim")
+    r.add_registered_template("jq", method="binaries", version="1.5")
+
+    # Write Singularity recipe.
+    sing_path = tmp_path / "Singularity"
+    sif_path = tmp_path / "jq-test.sif"
+    sing_path.write_text(str(r))
+    subprocess.run(
+        f"sudo singularity build {sif_path} {sing_path}".split(),
+        check=True,
+        cwd=tmp_path,
+    )
+    completed = subprocess.run(
+        f"singularity run {sif_path} jq --help".split(), capture_output=True, check=True
+    )
+    assert (
+        completed.stdout.decode().strip().startswith("jq - commandline JSON processor")
+    )
+    completed = subprocess.run(
+        f"singularity run {sif_path} jq --version".split(),
+        capture_output=True,
+        check=True,
+    )
+    assert completed.stdout.decode().strip().startswith("jq-1.5")
+    # Test that deb was installed
+    completed = subprocess.run(
+        f"singularity run {sif_path} fdfind --version".split(),
+        capture_output=True,
+        check=True,
+    )
+    assert completed.stdout.decode().strip() == "fd 7.2.0"
+
+
+@skip_if_no_singularity
+def test_build_singularity_jq15_source(tmp_path):
+    _TemplateRegistry._reset()
+    _TemplateRegistry.register("jq", _template_filepath)
+
+    # Create a Singularity recipe.
+    r = SingularityRenderer(pkg_manager="apt")
+    r.from_("debian:buster-slim")
+    r.add_registered_template("jq", method="source", version="1.5")
+
+    # Write Singularity recipe.
+    sing_path = tmp_path / "Singularity"
+    sif_path = tmp_path / "jq-test.sif"
+    sing_path.write_text(str(r))
+    subprocess.run(
+        f"sudo singularity build {sif_path} {sing_path}".split(),
+        check=True,
+        cwd=tmp_path,
+    )
+    completed = subprocess.run(
+        f"singularity run {sif_path} jq --help".split(), capture_output=True, check=True
+    )
+    assert (
+        completed.stdout.decode().strip().startswith("jq - commandline JSON processor")
+    )
+    completed = subprocess.run(
+        f"singularity run {sif_path} jq --version".split(),
+        capture_output=True,
+        check=True,
+    )
+    assert completed.stdout.decode().strip() == "jq-"

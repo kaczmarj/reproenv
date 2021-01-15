@@ -18,7 +18,7 @@ def test_docker_renderer_add_template():
                 "required": [],
                 "optional": [],
             },
-            "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
+            "dependencies": {"apt": ["curl"], "debs": [], "yum": ["python"]},
         },
     }
 
@@ -58,7 +58,7 @@ def test_docker_renderer_add_template():
         == """RUN yum install -y -q \\
            python \\
     && yum clean all \\
-       rm -rf /var/cache/yum/* \\
+    && rm -rf /var/cache/yum/* \\
     && echo hello \\
     && echo world"""
     )
@@ -74,22 +74,13 @@ def test_docker_renderer_add_template():
                 "required": ["name"],
                 "optional": [],
             },
-            "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
+            "dependencies": {"apt": ["curl"], "debs": [], "yum": ["python"]},
         },
     }
     r = DockerRenderer("apt")
     r.add_template(Template(d, binaries_kwds=dict(name="Bjork")), method="binaries")
     assert (
         str(r)
-        == """ENV foo="bar"
-RUN apt-get update -qq \\
-    && apt-get install -y -q --no-install-recommends \\
-           curl \\
-    && rm -rf /var/lib/apt/lists/* \\
-    && echo hello {{ template_0.template.binaries.name }}"""
-    )
-    assert (
-        r.render()
         == """ENV foo="bar"
 RUN apt-get update -qq \\
     && apt-get install -y -q --no-install-recommends \\
@@ -108,7 +99,7 @@ RUN apt-get update -qq \\
                 "required": [],
                 "optional": ["name"],
             },
-            "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
+            "dependencies": {"apt": ["curl"], "debs": [], "yum": ["python"]},
         },
     }
 
@@ -116,15 +107,6 @@ RUN apt-get update -qq \\
     r.add_template(Template(d), method="binaries")
     assert (
         str(r)
-        == """ENV foo="bar"
-RUN apt-get update -qq \\
-    && apt-get install -y -q --no-install-recommends \\
-           curl \\
-    && rm -rf /var/lib/apt/lists/* \\
-    && echo hello {{ template_0.template.binaries.name | default('foo') }}"""
-    )
-    assert (
-        r.render()
         == """ENV foo="bar"
 RUN apt-get update -qq \\
     && apt-get install -y -q --no-install-recommends \\
@@ -138,16 +120,16 @@ def test_docker_render_from_instance_methods():
     d = DockerRenderer("apt")
 
     d.from_("alpine")
-    assert d.render() == "FROM alpine"
+    assert str(d) == "FROM alpine"
 
     d = DockerRenderer("apt")
     d.from_("alpine", as_="builder")
-    assert d.render() == "FROM alpine AS builder"
+    assert str(d) == "FROM alpine AS builder"
 
     d = DockerRenderer("apt")
     d.from_("alpine", as_="builder")
     d.arg("FOO")
-    assert d.render() == "FROM alpine AS builder\nARG FOO"
+    assert str(d) == "FROM alpine AS builder\nARG FOO"
 
     d = DockerRenderer("apt")
     d.from_("alpine", as_="builder")
@@ -156,7 +138,7 @@ def test_docker_render_from_instance_methods():
         ["foo/bar/baz.txt", "foo/baz/cat.txt"], "/opt/", from_="builder", chown="neuro"
     )
     assert (
-        d.render()
+        str(d)
         == """\
 FROM alpine AS builder
 ARG FOO
@@ -173,7 +155,7 @@ COPY --from=builder --chown=neuro ["foo/bar/baz.txt", \\
     )
     d.env(PATH="$PATH:/opt/foo/bin")
     assert (
-        d.render()
+        str(d)
         == """\
 FROM alpine AS builder
 ARG FOO
@@ -192,7 +174,7 @@ ENV PATH="$PATH:/opt/foo/bin\""""
     d.env(PATH="$PATH:/opt/foo/bin")
     d.label(ORG="myorg")
     assert (
-        d.render()
+        str(d)
         == """\
 FROM alpine AS builder
 ARG FOO
@@ -213,7 +195,7 @@ LABEL ORG="myorg\""""
     d.label(ORG="myorg")
     d.run("echo foobar")
     assert (
-        d.render()
+        str(d)
         == """\
 FROM alpine AS builder
 ARG FOO
@@ -236,7 +218,7 @@ RUN echo foobar"""
     d.run("echo foobar")
     d.user("nonroot")
     assert (
-        d.render()
+        str(d)
         == """\
 FROM alpine AS builder
 ARG FOO
@@ -263,7 +245,7 @@ USER nonroot"""
     d.user("nonroot")
     d.workdir("/opt/foobar")
     assert (
-        d.render()
+        str(d)
         == """\
 FROM alpine AS builder
 ARG FOO
