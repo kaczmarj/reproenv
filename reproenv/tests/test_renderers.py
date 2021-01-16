@@ -2,6 +2,8 @@ import pytest
 
 from reproenv.exceptions import RendererError
 from reproenv.renderers import _Renderer
+from reproenv.renderers import DockerRenderer
+from reproenv.renderers import SingularityRenderer
 
 
 def test_renderer():
@@ -11,6 +13,28 @@ def test_renderer():
     _Renderer("apt")
     assert _Renderer("yum").users == {"root"}
     assert _Renderer("apt", users={"root", "foo"}).users == {"root", "foo"}
+
+
+@pytest.mark.parametrize("renderer_cls", [DockerRenderer, SingularityRenderer])
+def test_renderer_eq(renderer_cls):
+    # r: _Renderer = renderer("apt").from_("my_base_image").run("echo foobar")
+    r = renderer_cls("apt").from_("my_base_image").run("echo foobar")
+    # print(r)
+    assert r == r
+    assert r != f"{r}\necho foobar"
+    # empty lines do not affect equality
+    assert r == f"{r}\n"
+    # comments do not count
+    assert r == f"{r}\n# a comment"
+    # inline comments count
+    assert r != f"{r}\necho foo # inline comment"
+
+    r2: _Renderer = renderer_cls("apt").from_("my_base_image").run("echo foobar")
+    assert r == r2
+    assert r2 == r
+    r2.run("echo invalidate this")
+    assert r != r2
+    assert r2 != r
 
 
 def test_not_implemented_methods():
