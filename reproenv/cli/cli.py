@@ -5,8 +5,6 @@
 
 # TODO: add a dedicated class for key=value in the eat-all class.
 
-# TODO: bug! using registered templates multiple times only uses the last one.
-
 from pathlib import Path
 import typing as ty
 
@@ -22,15 +20,30 @@ from reproenv.types import allowed_pkg_managers
 
 # https://stackoverflow.com/a/65744803/5666087
 class OrderedParamsCommand(click.Command):
-    """Subclass of `click.Command` that preserves order of user-provided params."""
+    _options: ty.List[ty.Tuple[click.Parameter, ty.Any]] = []
 
-    def parse_args(self, ctx, args):
-        self._options: ty.List[ty.Tuple[click.Parameter, ty.Any]] = []
+    def parse_args(self, ctx: click.Context, args: ty.List[str]):
+        # run the parser for ourselves to preserve the passed order
         parser = self.make_parser(ctx)
+        param_order: ty.List[click.Parameter]
         opts, _, param_order = parser.parse_args(args=list(args))
         for param in param_order:
-            value, args = param.handle_parse_result(ctx, opts, args)
-            self._options.append((param, value))
+            value = opts[param.name]
+            # If we have multiple values, take the first one. We do this before type
+            # casting, because type casting for some reason brings all of the given
+            # values for a parameter into the container. Not sure why, but perhaps it
+            # has to do with the click.Context object.
+            if isinstance(value, list):
+                value = value.pop(0)
+            if param.multiple:
+                # If the value is supposed to be in a tuple, put it back in a tuple.
+                value = (value,)
+            value = param.type_cast_value(ctx, value)
+            if isinstance(value, tuple):
+                value = value[0]
+            type(self)._options.append((param, value))
+
+        # return "normal" parse results
         return super().parse_args(ctx, args)
 
 
@@ -233,10 +246,9 @@ def _add_registered_templates(cmd: click.Command) -> click.Command:
             f"--{name.lower()}",
             type=KeyValuePair(),
             cls=OptionEatAll,
-            # TODO make the help message niiiiice.
+            multiple=True,
             help=hlp,
         )
-        # This is what a decorator does.
         cmd = option(cmd)
     return cmd
 
@@ -252,7 +264,6 @@ def _params_to_renderer_dict(ctx: click.Context, pkg_manager):
     cmd = ctx.command
     cmd = ty.cast(OrderedParamsCommand, cmd)
     for param, value in cmd._options:
-        # print(param, value)
         d = _get_instruction_for_param(param=param, value=value)
         # TODO: what happens if `d is None`?
         if d is not None:
@@ -264,8 +275,7 @@ def _get_instruction_for_param(param: click.Parameter, value: ty.Any):
     # TODO: clean this up.
     d = None
     if param.name == "from_":
-        assert len(value) == 1
-        d = {"name": param.name, "kwds": {"base_image": value[0]}}
+        d = {"name": param.name, "kwds": {"base_image": value}}
     # arg
     elif param.name == "arg":
         d = {"name": param.name, "kwds": {"key": value, "value": value[0]}}
