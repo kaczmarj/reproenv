@@ -129,7 +129,7 @@ def docker(ctx: click.Context, pkg_manager, **kwds):
     click.echo(output)
 
 
-@generate.command()
+@generate.command(cls=OrderedParamsCommand)
 @click.pass_context
 def singularity(ctx: click.Context, pkg_manager, **kwds):
     """Generate a Singularity recipe."""
