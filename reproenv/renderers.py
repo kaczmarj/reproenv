@@ -74,9 +74,19 @@ class _Renderer:
         self.pkg_manager = pkg_manager
         self._users = {"root"} if users is None else users
 
-    @property
-    def jinja_template(self) -> jinja2.Template:
-        return _jinja_env.from_string(str(self))
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, (_Renderer, str)):
+            raise NotImplementedError()
+
+        def rm_empty_lines(s):
+            return "\n".join(
+                j
+                for j in str(s).splitlines()
+                if j.strip() and not j.strip().startswith("#")
+            )
+
+        # Empty lines and commented lines do not affect container definitions.
+        return rm_empty_lines(self) == rm_empty_lines(other)
 
     @property
     def users(self) -> ty.Set[str]:
@@ -410,6 +420,8 @@ class SingularityRenderer(_Renderer):
         return s
 
     def arg(self, *args, **kwargs):
+        # TODO: look into whether singularity has something like ARG, like passing in
+        # environment variables.
         raise NotImplementedError("Singularity does not support `ARG`.")
 
     def copy(
@@ -457,8 +469,9 @@ class SingularityRenderer(_Renderer):
         self._labels.update(kwds)  # type: ignore
         return self
 
-    def run(self, command: str):
+    def run(self, command: str) -> SingularityRenderer:
         self._post.append(command)
+        return self
 
     def user(self, user: str) -> SingularityRenderer:
         if user not in self._users:
