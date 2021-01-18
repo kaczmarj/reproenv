@@ -141,6 +141,7 @@ def _add_common_renderer_options(cmd: click.Command) -> click.Command:
             "--pkg-manager",
             type=click.Choice(allowed_pkg_managers, case_sensitive=False),
             required=True,
+            multiple=False,
             help="System package manager",
         ),
         click.option(
@@ -153,6 +154,7 @@ def _add_common_renderer_options(cmd: click.Command) -> click.Command:
         ),
         click.option(
             "--arg",
+            type=KeyValuePair(),
             multiple=True,
             help="Build-time variables (do not persist after container is built)",
         ),
@@ -160,11 +162,13 @@ def _add_common_renderer_options(cmd: click.Command) -> click.Command:
         click.option(
             "--copy",
             multiple=True,
+            type=KeyValuePair(),
+            cls=OptionEatAll,
             help="Copy files into the container",
         ),
         click.option(
             "--env",
-            # multiple=True,
+            multiple=True,
             type=KeyValuePair(),
             cls=OptionEatAll,
             help="Set persistent environment variables",
@@ -172,10 +176,12 @@ def _add_common_renderer_options(cmd: click.Command) -> click.Command:
         click.option(
             "--install",
             multiple=True,
+            cls=OptionEatAll,
             help="Install packages with system package manager",
         ),
         click.option(
             "--label",
+            multiple=True,
             type=KeyValuePair(),
             cls=OptionEatAll,
             help="Set labels on the container",
@@ -264,6 +270,7 @@ def _params_to_renderer_dict(ctx: click.Context, pkg_manager):
     cmd = ctx.command
     cmd = ty.cast(OrderedParamsCommand, cmd)
     for param, value in cmd._options:
+        print("in _paramstorenderer", param.name, value)
         d = _get_instruction_for_param(param=param, value=value)
         # TODO: what happens if `d is None`?
         if d is not None:
@@ -278,7 +285,9 @@ def _get_instruction_for_param(param: click.Parameter, value: ty.Any):
         d = {"name": param.name, "kwds": {"base_image": value}}
     # arg
     elif param.name == "arg":
-        d = {"name": param.name, "kwds": {"key": value, "value": value[0]}}
+        assert len(value) == 2, "expected key,value pair"
+        k, v = value
+        d = {"name": param.name, "kwds": {"key": k, "value": v}}
     # copy
     elif param.name == "copy":
         d = {"name": param.name, "kwds": {"source": value, "destination": value[0]}}
