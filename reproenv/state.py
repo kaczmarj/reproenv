@@ -155,3 +155,7 @@ class _TemplateRegistry:
     def keys(cls) -> ty.KeysView[str]:
         """Return names of registered templates."""
         return cls._templates.keys()
+
+    @classmethod
+    def items(cls) -> ty.ItemsView[str, TemplateType]:
+        return cls._templates.items()
