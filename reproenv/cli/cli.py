@@ -105,25 +105,7 @@ def generate():
 @click.pass_context
 def docker(ctx: click.Context, pkg_manager, **kwds):
     """Generate a Dockerfile."""
-
-    # Create a dictionary compatible with `_Renderer.from_dict()`.
-    renderer_dict = {
-        "pkg_manager": pkg_manager,
-        "instructions": [],
-    }
-
-    cmd = ctx.command
-    cmd = ty.cast(OrderedParamsCommand, cmd)
-    for param, value in cmd._options:
-        # print(param, value)
-        d = get_instruction_for_param(param=param, value=value)
-        # TODO: what happens if `d is None`?
-        if d is not None:
-            renderer_dict["instructions"].append(d)
-
-    # We could check if the instructions dict is empty, but it should never be
-    # empty because `--base-image` is required.
-
+    renderer_dict = _params_to_renderer_dict(ctx=ctx, pkg_manager=pkg_manager)
     renderer = DockerRenderer.from_dict(renderer_dict)
     output = str(renderer)
     click.echo(output)
@@ -133,25 +115,7 @@ def docker(ctx: click.Context, pkg_manager, **kwds):
 @click.pass_context
 def singularity(ctx: click.Context, pkg_manager, **kwds):
     """Generate a Singularity recipe."""
-
-    # Create a dictionary compatible with `_Renderer.from_dict()`.
-    renderer_dict = {
-        "pkg_manager": pkg_manager,
-        "instructions": [],
-    }
-
-    cmd = ctx.command
-    cmd = ty.cast(OrderedParamsCommand, cmd)
-    for param, value in cmd._options:
-        # print(param, value)
-        d = get_instruction_for_param(param=param, value=value)
-        # TODO: what happens if `d is None`?
-        if d is not None:
-            renderer_dict["instructions"].append(d)
-
-    # We could check if the instructions dict is empty, but it should never be
-    # empty because `--base-image` is required.
-
+    renderer_dict = _params_to_renderer_dict(ctx=ctx, pkg_manager=pkg_manager)
     renderer = SingularityRenderer.from_dict(renderer_dict)
     output = str(renderer)
     click.echo(output)
@@ -277,7 +241,26 @@ def _add_registered_templates(cmd: click.Command) -> click.Command:
     return cmd
 
 
-def get_instruction_for_param(param: click.Parameter, value: ty.Any):
+def _params_to_renderer_dict(ctx: click.Context, pkg_manager):
+    # Create a dictionary compatible with `_Renderer.from_dict()`.
+    renderer_dict = {
+        "pkg_manager": pkg_manager,
+        "instructions": [],
+    }
+    # We could check if the instructions dict is empty, but it should never be
+    # empty because `--base-image` is required.
+    cmd = ctx.command
+    cmd = ty.cast(OrderedParamsCommand, cmd)
+    for param, value in cmd._options:
+        # print(param, value)
+        d = _get_instruction_for_param(param=param, value=value)
+        # TODO: what happens if `d is None`?
+        if d is not None:
+            renderer_dict["instructions"].append(d)
+    return renderer_dict
+
+
+def _get_instruction_for_param(param: click.Parameter, value: ty.Any):
     # TODO: clean this up.
     d = None
     if param.name == "from_":
