@@ -22,7 +22,7 @@ def test_build_docker_from_dict_apt(tmp_path):
     client = docker.from_env()
 
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", _template_filepath)
+    _TemplateRegistry.register(_template_filepath)
 
     d = {
         "pkg_manager": "apt",
@@ -55,7 +55,7 @@ def test_build_docker_from_dict_yum(tmp_path):
     client = docker.from_env()
 
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", _template_filepath)
+    _TemplateRegistry.register(_template_filepath)
 
     d = {
         "pkg_manager": "yum",
@@ -83,7 +83,7 @@ def test_build_docker_from_dict_yum(tmp_path):
 @pytest.mark.long
 def test_build_singularity_from_dict_apt(tmp_path):
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", _template_filepath)
+    _TemplateRegistry.register(_template_filepath)
 
     d = {
         "pkg_manager": "apt",
@@ -130,7 +130,7 @@ def test_build_singularity_from_dict_apt(tmp_path):
 @pytest.mark.long
 def test_build_singularity_from_dict_yum(tmp_path):
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", _template_filepath)
+    _TemplateRegistry.register(_template_filepath)
 
     d = {
         "pkg_manager": "yum",
@@ -180,7 +180,7 @@ def test_build_docker_jq16_binaries(tmp_path):
     client = docker.from_env()
 
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", _template_filepath)
+    _TemplateRegistry.register(_template_filepath)
 
     r = DockerRenderer(pkg_manager="apt")
     r.from_("debian:buster-slim")
@@ -208,7 +208,7 @@ def test_build_docker_jq15_binaries(tmp_path):
     client = docker.from_env()
 
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", _template_filepath)
+    _TemplateRegistry.register(_template_filepath)
 
     r = DockerRenderer(pkg_manager="apt")
     r.from_("debian:buster-slim")
@@ -236,7 +236,7 @@ def test_build_docker_jq16_source(tmp_path):
     client = docker.from_env()
 
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", _template_filepath)
+    _TemplateRegistry.register(_template_filepath)
 
     r = DockerRenderer(pkg_manager="apt")
     r.from_("debian:buster-slim")
@@ -261,7 +261,7 @@ def test_build_docker_jq15_source(tmp_path):
     client = docker.from_env()
 
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", _template_filepath)
+    _TemplateRegistry.register(_template_filepath)
 
     r = DockerRenderer(pkg_manager="apt")
     r.from_("debian:buster-slim")
@@ -282,7 +282,7 @@ def test_build_docker_jq15_source(tmp_path):
 @pytest.mark.long
 def test_build_singularity_jq16_binaries(tmp_path):
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", _template_filepath)
+    _TemplateRegistry.register(_template_filepath)
 
     # Create a Singularity recipe.
     r = SingularityRenderer(pkg_manager="apt")
@@ -323,7 +323,7 @@ def test_build_singularity_jq16_binaries(tmp_path):
 @pytest.mark.long
 def test_build_singularity_jq15_binaries(tmp_path):
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", _template_filepath)
+    _TemplateRegistry.register(_template_filepath)
 
     # Create a Singularity recipe.
     r = SingularityRenderer(pkg_manager="apt")
@@ -364,7 +364,7 @@ def test_build_singularity_jq15_binaries(tmp_path):
 @pytest.mark.long
 def test_build_singularity_jq15_source(tmp_path):
     _TemplateRegistry._reset()
-    _TemplateRegistry.register("jq", _template_filepath)
+    _TemplateRegistry.register(_template_filepath)
 
     # Create a Singularity recipe.
     r = SingularityRenderer(pkg_manager="apt")

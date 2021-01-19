@@ -248,7 +248,7 @@ class _Renderer:
     def from_(self, base_image: str) -> _Renderer:
         raise NotImplementedError()
 
-    def install(self, pkgs: ty.List[str], opts="") -> _Renderer:
+    def install(self, pkgs: ty.List[str], opts=None) -> _Renderer:
         raise NotImplementedError()
 
     def label(self, **kwds: ty.Mapping[str, str]) -> _Renderer:
@@ -256,6 +256,10 @@ class _Renderer:
 
     def run(self, command: str) -> _Renderer:
         raise NotImplementedError()
+
+    def run_bash(self, command: str) -> _Renderer:
+        command = f"bash -c '{command}'"
+        return self.run(command)
 
     def user(self, user: str) -> _Renderer:
         raise NotImplementedError()
@@ -320,7 +324,7 @@ class DockerRenderer(_Renderer):
         self._parts.append(s)
         return self
 
-    def install(self, pkgs: ty.List[str], opts="") -> DockerRenderer:
+    def install(self, pkgs: ty.List[str], opts=None) -> DockerRenderer:
         """Install system packages."""
         command = _install(pkgs, pkg_manager=self.pkg_manager, opts=opts)
         command = _indent_run_instruction(command)
@@ -419,10 +423,12 @@ class SingularityRenderer(_Renderer):
 
         return s
 
-    def arg(self, *args, **kwargs):
+    def arg(self, key: str, value: str = None) -> SingularityRenderer:
         # TODO: look into whether singularity has something like ARG, like passing in
         # environment variables.
-        raise NotImplementedError("Singularity does not support `ARG`.")
+        s = f"{key}" if value is None else f"{key}={value}"
+        self._post.append(s)
+        return self
 
     def copy(
         self,
@@ -456,7 +462,7 @@ class SingularityRenderer(_Renderer):
         self._header = {"bootstrap": bootstrap, "from_": image}
         return self
 
-    def install(self, pkgs: ty.List[str], opts="") -> SingularityRenderer:
+    def install(self, pkgs: ty.List[str], opts=None) -> SingularityRenderer:
         """Install system packages."""
         command = _install(pkgs, pkg_manager=self.pkg_manager, opts=opts)
         self.run(command)
@@ -517,6 +523,7 @@ def _install(pkgs: ty.List[str], pkg_manager: str, opts: str = None) -> str:
         return _apt_install(pkgs, opts)
     elif pkg_manager == "yum":
         return _yum_install(pkgs, opts)
+    # TODO: add debs here?
     else:
         raise RendererError(f"Unknown package manager '{pkg_manager}'.")
 

@@ -52,6 +52,9 @@ def test_not_implemented_methods():
     with pytest.raises(NotImplementedError):
         r.run("foo")
     with pytest.raises(NotImplementedError):
+        # This is implemented but calls `.run()`
+        r.run_bash("foo")
+    with pytest.raises(NotImplementedError):
         r.user("nonroot")
     with pytest.raises(NotImplementedError):
         r.workdir("/opt/")
