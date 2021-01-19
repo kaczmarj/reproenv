@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 
 from click.testing import CliRunner
 import pytest
@@ -15,11 +16,16 @@ from reproenv.tests.utils import skip_if_no_singularity
 
 @skip_if_no_docker
 @skip_if_no_singularity
+@pytest.mark.long
 @pytest.mark.parametrize("cmd", ["docker", "singularity"])
 @pytest.mark.parametrize(
     ["pkg_manager", "base_image"], [("apt", "debian:buster-slim"), ("yum", "centos:7")]
 )
-def test_build_image_from_registered(cmd: str, pkg_manager: str, base_image: str):
+def test_build_image_from_registered(
+    tmp_path: Path, cmd: str, pkg_manager: str, base_image: str
+):
+    import docker
+
     # Templates are in this directory.
     template_path = Path(__file__).parent
     runner = CliRunner(env={"REPROENV_TEMPLATE_PATH": str(template_path)})
@@ -35,10 +41,36 @@ def test_build_image_from_registered(cmd: str, pkg_manager: str, base_image: str
             pkg_manager,
             "--jq",
             "version=1.5",
-            "--jq",
-            "version=1.6",
         ],
     )
     assert result.exit_code == 0, result.output
     assert "jq-1.5/jq-linux64" in result.output
-    assert "jq-1.6/jq-linux64" in result.output
+
+    if cmd == "docker":
+        # build docker image
+        (tmp_path / "Dockerfile").write_text(result.output)
+        client = docker.from_env()
+        image = client.images.build(path=str(tmp_path), tag="reproenvtest", rm=True)
+        image = image[0]  # This is a tuple...
+        stdout = client.containers.run(image=image, command="jq --help")
+        assert "jq is a tool for processing JSON" in stdout.decode().strip()
+
+    elif cmd == "singularity":
+        # build singularity image
+        sing_path = tmp_path / "Singularity"
+        sif_path = tmp_path / "test.sif"
+        sing_path.write_text(result.output)
+        subprocess.run(
+            f"sudo singularity build {sif_path} {sing_path}".split(),
+            check=True,
+            cwd=tmp_path,
+        )
+        completed = subprocess.run(
+            f"singularity run {sif_path} jq --help".split(),
+            capture_output=True,
+            check=True,
+        )
+        assert "jq is a tool for processing JSON" in completed.stdout.decode()
+
+    else:
+        raise ValueError(f"unknown command: {cmd}")
