@@ -202,7 +202,7 @@ su - nonroot
 ORG BAZ"""
     )
 
-    # Workdir
+    # nonroot user
     s = SingularityRenderer("apt")
     s.from_("alpine")
     s.copy(["foo/bar/baz.txt", "foo/baz/cat.txt"], "/opt/")
@@ -241,6 +241,53 @@ cd /opt/foo
 su - root
 
 su - nonroot
+
+%labels
+ORG BAZ"""
+    )
+
+    # run bash
+    s = SingularityRenderer("apt")
+    s.from_("alpine")
+    s.copy(["foo/bar/baz.txt", "foo/baz/cat.txt"], "/opt/")
+    s.env(FOO="BAR")
+    s.label(ORG="BAZ")
+    s.run("echo foobar")
+    s.user("nonroot")
+    s.workdir("/opt/foo")
+    s.user("root")
+    s.user("nonroot")
+    s.run_bash("source activate")
+    assert (
+        str(s)
+        == """\
+Bootstrap: docker
+From: alpine
+
+%files
+foo/bar/baz.txt /opt/
+foo/baz/cat.txt /opt/
+
+%environment
+export FOO="BAR"
+
+%post
+echo foobar
+
+test "$(getent passwd nonroot)" \\
+|| useradd --no-user-group --create-home --shell /bin/bash nonroot
+
+
+su - nonroot
+
+mkdir -p /opt/foo
+cd /opt/foo
+
+su - root
+
+su - nonroot
+
+bash -c 'source activate'
 
 %labels
 ORG BAZ"""

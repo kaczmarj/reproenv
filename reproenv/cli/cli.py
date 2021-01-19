@@ -162,9 +162,11 @@ def _add_common_renderer_options(cmd: click.Command) -> click.Command:
         click.option(
             "--copy",
             multiple=True,
-            type=KeyValuePair(),
             cls=OptionEatAll,
-            help="Copy files into the container",
+            help=(
+                "Copy files into the container. Provide at least two paths."
+                " The last path is always the destination path in the container."
+            ),
         ),
         click.option(
             "--env",
@@ -189,7 +191,12 @@ def _add_common_renderer_options(cmd: click.Command) -> click.Command:
         click.option(
             "--run",
             multiple=True,
-            help="Execute commands in /bin/sh",
+            help="Run commands in /bin/sh",
+        ),
+        click.option(
+            "--run-bash",
+            multiple=True,
+            help="Run commands in a bash shell",
         ),
         click.option(
             "--user",
@@ -270,7 +277,6 @@ def _params_to_renderer_dict(ctx: click.Context, pkg_manager):
     cmd = ctx.command
     cmd = ty.cast(OrderedParamsCommand, cmd)
     for param, value in cmd._options:
-        print("in _paramstorenderer", param.name, value)
         d = _get_instruction_for_param(param=param, value=value)
         # TODO: what happens if `d is None`?
         if d is not None:
@@ -285,33 +291,48 @@ def _get_instruction_for_param(param: click.Parameter, value: ty.Any):
         d = {"name": param.name, "kwds": {"base_image": value}}
     # arg
     elif param.name == "arg":
-        assert len(value) == 2, "expected key,value pair"
+        assert len(value) == 2, "expected key=value pair for --arg"
         k, v = value
         d = {"name": param.name, "kwds": {"key": k, "value": v}}
     # copy
     elif param.name == "copy":
-        d = {"name": param.name, "kwds": {"source": value, "destination": value[0]}}
+        assert len(value) > 1, "expected at least two values for --copy"
+        source, destination = list(value[:-1]), value[-1]
+        d = {"name": param.name, "kwds": {"source": source, "destination": destination}}
     # env
     elif param.name == "env":
         value = dict(value)
         d = {"name": param.name, "kwds": {**value}}
     # install
     elif param.name == "install":
-        # TODO: add 'opts' kwd.
-        d = {"name": param.name, "kwds": {"pkgs": value}}
+        opts = None
+        if isinstance(value, tuple):
+            value = list(value)
+        # Special case. Set `opts` if provided.
+        for idx, val in enumerate(value):
+            if val.startswith("opts="):
+                opts = value.pop(idx)
+                opts = opts[5:]  # strip "opts="
+        d = {
+            "name": param.name,
+            "kwds": {"pkgs": value, "opts": opts},
+        }
     # label
     elif param.name == "label":
         value = dict(value)
         d = {"name": param.name, "kwds": {**value}}
     # run
     elif param.name == "run":
-        d = {"name": param.name, "kwds": {"command": value[0]}}
+        d = {"name": param.name, "kwds": {"command": value}}
+    # run_bash
+    elif param.name == "run_bash":
+        d = {"name": param.name, "kwds": {"command": value}}
     # user
     elif param.name == "user":
-        d = {"name": param.name, "kwds": {"user": value[0]}}
+        d = {"name": param.name, "kwds": {"user": value}}
     # workdir
     elif param.name == "workdir":
-        d = {"name": param.name, "kwds": {"path": value[0]}}
+        d = {"name": param.name, "kwds": {"path": value}}
     # probably a registered template?
     else:
         if param.name.lower() in _TemplateRegistry.keys():

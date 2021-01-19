@@ -54,10 +54,16 @@
             "$ref": "#/definitions/env"
           },
           {
+            "$ref": "#/definitions/install"
+          },
+          {
             "$ref": "#/definitions/label"
           },
           {
             "$ref": "#/definitions/run"
+          },
+          {
+            "$ref": "#/definitions/run_bash"
           },
           {
             "$ref": "#/definitions/user"
@@ -182,6 +188,47 @@
       "examples": [],
       "additionalProperties": false
     },
+    "install": {
+      "required": [
+        "name",
+        "kwds"
+      ],
+      "properties": {
+        "name": {
+          "enum": [
+            "install"
+          ]
+        },
+        "kwds": {
+          "type": "object",
+          "required": [
+            "pkgs"
+          ],
+          "properties": {
+            "pkgs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            "opts": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "examples": [],
+      "additionalProperties": false
+    },
     "label": {
       "required": [
         "name",
@@ -213,6 +260,33 @@
         "name": {
           "enum": [
             "run"
+          ]
+        },
+        "kwds": {
+          "type": "object",
+          "required": [
+            "command"
+          ],
+          "properties": {
+            "command": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "examples": [],
+      "additionalProperties": false
+    },
+    "run_bash": {
+      "required": [
+        "name",
+        "kwds"
+      ],
+      "properties": {
+        "name": {
+          "enum": [
+            "run_bash"
           ]
         },
         "kwds": {

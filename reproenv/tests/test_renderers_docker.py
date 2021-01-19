@@ -258,3 +258,31 @@ RUN echo foobar
 USER nonroot
 WORKDIR /opt/foobar"""
     )
+
+    d = DockerRenderer("apt", users={"root", "nonroot"})
+    d.from_("alpine", as_="builder")
+    d.arg("FOO")
+    d.copy(
+        ["foo/bar/baz.txt", "foo/baz/cat.txt"], "/opt/", from_="builder", chown="neuro"
+    )
+    d.env(PATH="$PATH:/opt/foo/bin")
+    d.label(ORG="myorg")
+    d.run("echo foobar")
+    d.user("nonroot")
+    d.workdir("/opt/foobar")
+    d.run_bash("source activate")
+    assert (
+        str(d)
+        == """\
+FROM alpine AS builder
+ARG FOO
+COPY --from=builder --chown=neuro ["foo/bar/baz.txt", \\
+      "foo/baz/cat.txt", \\
+      "/opt/"]
+ENV PATH="$PATH:/opt/foo/bin"
+LABEL ORG="myorg"
+RUN echo foobar
+USER nonroot
+WORKDIR /opt/foobar
+RUN bash -c 'source activate'"""
+    )
