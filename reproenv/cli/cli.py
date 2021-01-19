@@ -77,9 +77,8 @@ class OrderedParamsCommand(click.Command):
     parameters.
     """
 
-    _options: ty.List[ty.Tuple[click.Parameter, ty.Any]] = []
-
     def parse_args(self, ctx: click.Context, args: ty.List[str]):
+        self._options: ty.List[ty.Tuple[click.Parameter, ty.Any]] = []
         # run the parser for ourselves to preserve the passed order
         parser = self.make_parser(ctx)
         param_order: ty.List[click.Parameter]
@@ -98,7 +97,7 @@ class OrderedParamsCommand(click.Command):
             value = param.type_cast_value(ctx, value)
             if isinstance(value, tuple):
                 value = value[0]
-            type(self)._options.append((param, value))
+            self._options.append((param, value))
 
         # return "normal" parse results
         return super().parse_args(ctx, args)
