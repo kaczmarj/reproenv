@@ -2,54 +2,54 @@
 
 from pathlib import Path
 
-import click
 from click.testing import CliRunner
 import pytest
 
-from reproenv import register_template
-from reproenv.cli.cli import docker as generate_docker
-from reproenv.cli.cli import singularity as generate_singularity
+from reproenv.cli.cli import generate
+
+_cmds = ["docker", "singularity"]
 
 
-@pytest.mark.parametrize("cmd", [generate_docker, generate_singularity])
-def test_fail_on_empty_args(cmd: click.Command):
+@pytest.mark.parametrize("cmd", _cmds)
+def test_fail_on_empty_args(cmd: str):
     runner = CliRunner()
-    result = runner.invoke(cmd)
-    assert result.exit_code != 0
+    result = runner.invoke(generate, [cmd])
+    assert result.exit_code != 0, result.output
 
 
-@pytest.mark.parametrize("cmd", [generate_docker, generate_singularity])
+@pytest.mark.parametrize("cmd", _cmds)
 @pytest.mark.parametrize("pkg_manager", ["apt", "yum"])
-def test_fail_on_no_base(cmd: click.Command, pkg_manager: str):
+def test_fail_on_no_base(cmd: str, pkg_manager: str):
     runner = CliRunner()
-    result = runner.invoke(cmd, ["--pkg-manager", pkg_manager])
-    assert result.exit_code != 0
+    result = runner.invoke(generate, [cmd, "--pkg-manager", pkg_manager])
+    assert result.exit_code != 0, result.output
 
 
-@pytest.mark.parametrize("cmd", [generate_docker, generate_singularity])
-def test_fail_on_no_pkg_manager(cmd: click.Command):
+@pytest.mark.parametrize("cmd", _cmds)
+def test_fail_on_no_pkg_manager(cmd: str):
     runner = CliRunner()
-    result = runner.invoke(cmd, ["--base-image", "debian"])
-    assert result.exit_code != 0
+    result = runner.invoke(generate, [cmd, "--base-image", "debian"])
+    assert result.exit_code != 0, result.output
 
 
-@pytest.mark.parametrize("cmd", [generate_docker, generate_singularity])
+@pytest.mark.parametrize("cmd", _cmds)
 @pytest.mark.parametrize("pkg_manager", ["apt", "yum"])
-def test_minimal_args(cmd: click.Command, pkg_manager: str):
+def test_minimal_args(cmd: str, pkg_manager: str):
     runner = CliRunner()
     result = runner.invoke(
-        cmd, ["--pkg-manager", pkg_manager, "--base-image", "debian"]
+        generate, [cmd, "--pkg-manager", pkg_manager, "--base-image", "debian"]
     )
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
 
 
-@pytest.mark.parametrize("cmd", [generate_docker, generate_singularity])
+@pytest.mark.parametrize("cmd", _cmds)
 @pytest.mark.parametrize("pkg_manager", ["apt", "yum"])
-def test_all_args(cmd: click.Command, pkg_manager: str):
+def test_all_args(cmd: str, pkg_manager: str):
     runner = CliRunner()
     result = runner.invoke(
-        cmd,
+        generate,
         [
+            cmd,
             "--pkg-manager",
             pkg_manager,
             "--base-image",
@@ -84,20 +84,22 @@ def test_all_args(cmd: click.Command, pkg_manager: str):
             "/data",
         ],
     )
-    assert result.exit_code == 0, result.exception
+    assert result.exit_code == 0, result.output
 
 
 # Test that a template can be rendered
-@pytest.mark.parametrize("cmd", [generate_docker, generate_singularity])
+# We need to use `reproenv generate` as the entrypoint here because the generate command
+# is what registers the templates. Using the `docker` function
+# (`reproenv generate docker`) directly does not fire `generate`.
+@pytest.mark.parametrize("cmd", _cmds)
 @pytest.mark.parametrize("pkg_manager", ["apt", "yum"])
-def test_render_registered(cmd: click.Command, pkg_manager: str):
-    path = Path(__file__).parent / "sample-template-jq.yaml"
-    register_template(path)
-
-    runner = CliRunner()
+def test_render_registered(cmd: str, pkg_manager: str):
+    template_path = Path(__file__).parent
+    runner = CliRunner(env={"REPROENV_TEMPLATE_PATH": str(template_path)})
     result = runner.invoke(
-        cmd,
+        generate,
         [
+            cmd,
             "--base-image",
             "debian:buster",
             "--pkg-manager",
@@ -108,6 +110,6 @@ def test_render_registered(cmd: click.Command, pkg_manager: str):
             "version=1.6",
         ],
     )
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert "jq-1.5/jq-linux64" in result.output
     assert "jq-1.6/jq-linux64" in result.output
