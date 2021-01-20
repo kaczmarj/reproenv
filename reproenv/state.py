@@ -13,8 +13,8 @@ import yaml
 # purposes of this package.
 try:
     from yaml import CSafeLoader as SafeLoader
-except ImportError:
-    from yaml import SafeLoader  # type: ignore
+except ImportError:  # pragma: no cover
+    from yaml import SafeLoader  # type: ignore  # pragma: no cover
 
 from reproenv.exceptions import RendererError
 from reproenv.exceptions import TemplateError

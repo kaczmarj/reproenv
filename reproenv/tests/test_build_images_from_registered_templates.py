@@ -8,6 +8,7 @@ import pytest
 from reproenv.renderers import DockerRenderer
 from reproenv.renderers import SingularityRenderer
 from reproenv.state import _TemplateRegistry
+from reproenv.tests.utils import singularity_build
 from reproenv.tests.utils import skip_if_no_docker
 from reproenv.tests.utils import skip_if_no_singularity
 
@@ -100,11 +101,8 @@ def test_build_singularity_from_dict_apt(tmp_path):
     sing_path = tmp_path / "Singularity"
     sif_path = tmp_path / "jq-test.sif"
     sing_path.write_text(str(r))
-    subprocess.run(
-        f"sudo singularity build {sif_path} {sing_path}".split(),
-        check=True,
-        cwd=tmp_path,
-    )
+
+    _ = singularity_build(image_path=sif_path, build_spec=sing_path, cwd=tmp_path)
     completed = subprocess.run(
         f"singularity run {sif_path} jq --help".split(), capture_output=True, check=True
     )
@@ -147,11 +145,7 @@ def test_build_singularity_from_dict_yum(tmp_path):
     sing_path = tmp_path / "Singularity"
     sif_path = tmp_path / "jq-test.sif"
     sing_path.write_text(str(r))
-    subprocess.run(
-        f"sudo singularity build {sif_path} {sing_path}".split(),
-        check=True,
-        cwd=tmp_path,
-    )
+    _ = singularity_build(image_path=sif_path, build_spec=sing_path, cwd=tmp_path)
     completed = subprocess.run(
         f"singularity run {sif_path} jq --help".split(), capture_output=True, check=True
     )
@@ -293,11 +287,7 @@ def test_build_singularity_jq16_binaries(tmp_path):
     sing_path = tmp_path / "Singularity"
     sif_path = tmp_path / "jq-test.sif"
     sing_path.write_text(str(r))
-    subprocess.run(
-        f"sudo singularity build {sif_path} {sing_path}".split(),
-        check=True,
-        cwd=tmp_path,
-    )
+    _ = singularity_build(image_path=sif_path, build_spec=sing_path, cwd=tmp_path)
     completed = subprocess.run(
         f"singularity run {sif_path} jq --help".split(), capture_output=True, check=True
     )
@@ -334,11 +324,7 @@ def test_build_singularity_jq15_binaries(tmp_path):
     sing_path = tmp_path / "Singularity"
     sif_path = tmp_path / "jq-test.sif"
     sing_path.write_text(str(r))
-    subprocess.run(
-        f"sudo singularity build {sif_path} {sing_path}".split(),
-        check=True,
-        cwd=tmp_path,
-    )
+    _ = singularity_build(image_path=sif_path, build_spec=sing_path, cwd=tmp_path)
     completed = subprocess.run(
         f"singularity run {sif_path} jq --help".split(), capture_output=True, check=True
     )
@@ -375,11 +361,7 @@ def test_build_singularity_jq15_source(tmp_path):
     sing_path = tmp_path / "Singularity"
     sif_path = tmp_path / "jq-test.sif"
     sing_path.write_text(str(r))
-    subprocess.run(
-        f"sudo singularity build {sif_path} {sing_path}".split(),
-        check=True,
-        cwd=tmp_path,
-    )
+    _ = singularity_build(image_path=sif_path, build_spec=sing_path, cwd=tmp_path)
     completed = subprocess.run(
         f"singularity run {sif_path} jq --help".split(), capture_output=True, check=True
     )

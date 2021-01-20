@@ -1,4 +1,8 @@
+import getpass
+import os
+from pathlib import Path
 import subprocess
+import typing as ty
 
 import pytest
 
@@ -20,8 +24,11 @@ def _docker_available():
 
 
 def _singularity_available():
-    process = subprocess.run("sudo singularity help".split())
-    return process.returncode == 0
+    try:
+        process = subprocess.run(["singularity", "help"])
+        return process.returncode == 0
+    except FileNotFoundError:
+        return False
 
 
 # See https://docs.pytest.org/en/stable/skipping.html#id1 for skipif.
@@ -33,3 +40,28 @@ skip_if_no_docker = pytest.mark.skipif(
 skip_if_no_singularity = pytest.mark.skipif(
     not _singularity_available(), reason="singularity not available"
 )
+
+
+def singularity_build(
+    image_path: ty.Union[os.PathLike, str],
+    build_spec: ty.Union[os.PathLike, str],
+    cwd: ty.Union[os.PathLike, str] = None,
+) -> subprocess.CompletedProcess:
+    """Wrapper for `singularity build`.
+
+    If `sudo singularity` is not available, the full path to `singularity` can be set
+    with the environment variable `REPROENV_SINGULARITY_PROGRAM`.
+    """
+    user = getpass.getuser()
+    # Set singularity cache to /dev/shm
+    cachedir = Path("/") / "dev" / "shm" / user / "singularity"
+    singularity = os.environ.get("REPROENV_SINGULARITY_PROGRAM", "singularity")
+    cmds = [
+        "sudo",
+        f"SINGULARITY_CACHEDIR={cachedir}",
+        singularity,
+        "build",
+        str(image_path),
+        str(build_spec),
+    ]
+    return subprocess.run(cmds, check=True, cwd=cwd)

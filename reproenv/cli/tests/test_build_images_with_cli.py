@@ -5,6 +5,7 @@ from click.testing import CliRunner
 import pytest
 
 from reproenv.cli.cli import generate
+from reproenv.tests.utils import singularity_build
 from reproenv.tests.utils import skip_if_no_docker
 from reproenv.tests.utils import skip_if_no_singularity
 
@@ -14,10 +15,14 @@ from reproenv.tests.utils import skip_if_no_singularity
 # (`reproenv generate docker`) directly does not fire `generate`.
 
 
-@skip_if_no_docker
-@skip_if_no_singularity
 @pytest.mark.long
-@pytest.mark.parametrize("cmd", ["docker", "singularity"])
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        pytest.param("docker", marks=skip_if_no_docker),
+        pytest.param("singularity", marks=skip_if_no_singularity),
+    ],
+)
 @pytest.mark.parametrize(
     ["pkg_manager", "base_image"], [("apt", "debian:buster-slim"), ("yum", "centos:7")]
 )
@@ -60,11 +65,7 @@ def test_build_image_from_registered(
         sing_path = tmp_path / "Singularity"
         sif_path = tmp_path / "test.sif"
         sing_path.write_text(result.output)
-        subprocess.run(
-            f"sudo singularity build {sif_path} {sing_path}".split(),
-            check=True,
-            cwd=tmp_path,
-        )
+        _ = singularity_build(image_path=sif_path, build_spec=sing_path, cwd=tmp_path)
         completed = subprocess.run(
             f"singularity run {sif_path} jq --help".split(),
             capture_output=True,
