@@ -1,16 +1,4 @@
-"""Container specification renderers.
-
-General overview of rendering:
-1. Collect list of templates (either binaries or source installation method)
-2. For each template,
-    - Put together the raw string that will install that software. Do not
-        render with jinja2 yet.
-    - Change any references to `self` to some unique ID.
-3. Collect the raw strings from each template and render with jinja2. Pass in
-    keyword arguments of the unique IDs (that replaced `self`) so that instance
-    methods and variables are used during rendering. This allows us to render
-    everything just once.
-"""
+"""Container specification renderers."""
 
 from __future__ import annotations
 
