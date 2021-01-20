@@ -159,3 +159,8 @@ class _TemplateRegistry:
     @classmethod
     def items(cls) -> ty.ItemsView[str, TemplateType]:
         return cls._templates.items()
+
+
+register_template = _TemplateRegistry.register
+registered_templates = _TemplateRegistry.keys
+get_template = _TemplateRegistry.get
