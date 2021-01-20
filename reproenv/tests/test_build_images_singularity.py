@@ -1,6 +1,7 @@
 import subprocess
 
 from reproenv.renderers import SingularityRenderer
+from reproenv.tests.utils import singularity_build
 from reproenv.tests.utils import skip_if_no_singularity
 
 
@@ -26,11 +27,7 @@ def test_build_a(tmp_path):
     sing_path = tmp_path / "Singularity"
     sif_path = tmp_path / "test.sif"
     sing_path.write_text(str(d))
-    subprocess.run(
-        f"sudo singularity build {sif_path} {sing_path}".split(),
-        check=True,
-        cwd=tmp_path,
-    )
+    _ = singularity_build(image_path=sif_path, build_spec=sing_path, cwd=tmp_path)
     completed = subprocess.run(
         f"singularity run {sif_path} ls /opt".split(), capture_output=True, check=True
     )
