@@ -13,7 +13,7 @@ def test_docker_renderer_add_template():
         "binaries": {
             "urls": {"1.0.0": "foobar"},
             "env": {"foo": "bar"},
-            "instructions": "echo hello\necho world",
+            "instructions": "{{self.install_dependencies()}}\necho hello\necho world",
             "arguments": {
                 "required": [],
                 "optional": {},
@@ -69,7 +69,9 @@ def test_docker_renderer_add_template():
         "binaries": {
             "urls": {"1.0.0": "foobar"},
             "env": {"foo": "bar"},
-            "instructions": "echo hello {{ self.name }}",
+            "instructions": (
+                "{{self.install_dependencies()}}\necho hello {{ self.name }}"
+            ),
             "arguments": {
                 "required": ["name"],
                 "optional": {},
@@ -94,7 +96,9 @@ RUN apt-get update -qq \\
         "binaries": {
             "urls": {"1.0.0": "foobar"},
             "env": {"foo": "bar"},
-            "instructions": "echo hello {{ self.name }}",
+            "instructions": (
+                "{{self.install_dependencies()}}\necho hello {{ self.name }}"
+            ),
             "arguments": {
                 "required": [],
                 "optional": {"name": "foo"},

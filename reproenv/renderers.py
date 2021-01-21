@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import types
 import typing as ty
 
 import jinja2
@@ -28,13 +29,14 @@ _jinja_env = jinja2.Environment(undefined=jinja2.StrictUndefined)
 # TODO: add a flag that avoids buggy behavior when basing a new container on
 # one created with ReproEnv.
 
-# TODO: add `install` instance method to `_Renderer`.
-
 
 def _render_string_from_template(
     source: str, template: _BaseInstallationTemplate
 ) -> str:
     """Take a string from a template and render """
+    # TODO: we could use a while loop or recursive function to render the template until
+    # there are no jinja-specific things. At this point, we support one level of
+    # nesting.
     source = source.replace("self.", "template.")
     tmpl = _jinja_env.from_string(source)
     err = (
@@ -44,9 +46,23 @@ def _render_string_from_template(
         " start with `self.`."
     )
     try:
-        return tmpl.render(template=template)
+        first_pass = tmpl.render(template=template)
     except jinja2.exceptions.UndefinedError as e:
         raise RendererError(err) from e
+
+    if (
+        _jinja_env.variable_start_string not in first_pass
+        and _jinja_env.variable_end_string not in first_pass
+    ):
+        return first_pass
+
+    # Render the string again. This is sometimes necessary because some defaults in the
+    # template are rendered as {{ self.X }}. These defaults need to be rendered again.
+    try:
+        first_pass = first_pass.replace("self.", "template.")
+        return _jinja_env.from_string(first_pass).render(template=template)
+    except jinja2.exceptions.UndefinedError:
+        raise TemplateError(err)
 
 
 class _Renderer:
@@ -111,8 +127,8 @@ class _Renderer:
                     renderer.add_registered_template(method_or_template, **kwds)
                 except TemplateError as e:
                     raise RendererError(
-                        f"Error on template '{method_or_template}'. Please see"
-                        " the traceback above for details. Was the template registered?"
+                        f"Error on template '{method_or_template}'. Please see above"
+                        " for more information."
                     ) from e
         return renderer
 
@@ -165,20 +181,34 @@ class _Renderer:
             }
             self.env(**d)
 
+        # Patch the `template_method.install_dependencies` instance method so it can be
+        # used (ie rendered) in a template and have access to the pkg_manager requested.
+        def install_dependencies_patch(
+            inner_self: _BaseInstallationTemplate, opts: str = None
+        ) -> str:
+            # TODO: test that template with empty dependencies (apt: []) does not render
+            # any installation of dependencies.
+            cmd = ""
+            pkgs = inner_self.dependencies(pkg_manager=self.pkg_manager)
+            if pkgs:
+                cmd += _install(pkgs=pkgs, pkg_manager=self.pkg_manager, opts=opts)
+            if self.pkg_manager == "apt":
+                debs = inner_self.dependencies("debs")
+                if debs:
+                    cmd += "\n" + _apt_install_debs(debs)
+            return cmd
+
+        # mypy complains when we try to patch a class, so we do it behind its back with
+        # setattr. See https://github.com/python/mypy/issues/2427
+        setattr(
+            template_method,
+            "install_dependencies",
+            types.MethodType(install_dependencies_patch, template_method),
+        )
+
         # Add installation instructions (render any jinja templates).
         if template_method.instructions:
-            command = ""
-            dependencies = template_method.dependencies(self.pkg_manager)
-            if dependencies:
-                # TODO: how can we pass in arguments here?
-                command += _install(pkgs=dependencies, pkg_manager=self.pkg_manager)
-                # Install debs if we are using apt and debs are requested.
-                if self.pkg_manager == "apt":
-                    debs = template_method.dependencies("debs")
-                    if debs:
-                        command += "\n" + _apt_install_debs(debs)
-                command += "\n"
-            command += _render_string_from_template(
+            command = _render_string_from_template(
                 template_method.instructions, template_method
             )
             self.run(command)
@@ -236,7 +266,7 @@ class _Renderer:
     def from_(self, base_image: str) -> _Renderer:
         raise NotImplementedError()
 
-    def install(self, pkgs: ty.List[str], opts=None) -> _Renderer:
+    def install(self, pkgs: ty.List[str], opts: str = None) -> _Renderer:
         raise NotImplementedError()
 
     def label(self, **kwds: ty.Mapping[str, str]) -> _Renderer:

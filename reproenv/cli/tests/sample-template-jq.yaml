@@ -15,6 +15,7 @@ binaries:
     ND_BAZ: '1234'
     ND_FOO: BAR
   instructions: |
+    {{ self.install_dependencies() }}
     curl -fsSL --output /usr/local/bin/jq {{ self.urls[self.version]}}
     chmod +x /usr/local/bin/jq
   urls:
@@ -45,6 +46,7 @@ source:
     ND_BAZ: '1234'
     ND_FOO: BAR
   instructions: |
+    {{ self.install_dependencies() }}
     mkdir jq
     cd jq
     curl -fsSL https://github.com/stedolan/jq/releases/download/jq-{{self.version}}/jq-{{self.version}}.tar.gz \

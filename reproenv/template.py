@@ -200,6 +200,12 @@ class _BaseInstallationTemplate:
         # TODO: not sure why the following line raises a type error in mypy.
         return deps_dict.get(pkg_manager, [])  # type: ignore
 
+    def install_dependencies(self, opts: str = None) -> str:
+        raise NotImplementedError(
+            "this method is meant to be patched by renderer objects, so it can be used"
+            " in templates and have access to the pkg_manager being used."
+        )
+
 
 class _BinariesTemplate(_BaseInstallationTemplate):
     def __init__(self, template: _BinariesTemplateType, **kwds: str):

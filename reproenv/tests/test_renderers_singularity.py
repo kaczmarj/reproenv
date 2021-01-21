@@ -13,12 +13,18 @@ def test_singularity_renderer_add_template():
         "binaries": {
             "urls": {"1.0.0": "foobar"},
             "env": {"foo": "bar"},
-            "instructions": "echo hello {{ self.myname }}",
+            "instructions": (
+                "{{self.install_dependencies()}}\necho hello {{ self.myname }}"
+            ),
             "arguments": {
                 "required": ["myname"],
                 "optional": {},
             },
-            "dependencies": {"apt": ["curl wget"], "debs": [], "yum": ["python wget"]},
+            "dependencies": {
+                "apt": ["curl", "wget"],
+                "debs": [],
+                "yum": ["python", "wget"],
+            },
         },
     }
 
@@ -47,7 +53,8 @@ export foo="bar"
 %post
 apt-get update -qq
 apt-get install -y -q --no-install-recommends \\
-    curl wget
+    curl \\
+    wget
 rm -rf /var/lib/apt/lists/*
 echo hello Bjork"""
     )
@@ -57,7 +64,9 @@ echo hello Bjork"""
         "binaries": {
             "urls": {"1.0.0": "foobar"},
             "env": {"foo": "bar"},
-            "instructions": "echo hello {{ self.myname }}",
+            "instructions": (
+                "{{self.install_dependencies()}}\necho hello {{ self.myname }}"
+            ),
             "arguments": {
                 "required": [],
                 "optional": {"myname": "foo"},
