@@ -252,8 +252,8 @@ def _create_help_for_template(template):
             if arg == "version" and method == "binaries":
                 h += f"""\n        version=[{'|'.join(
                     sorted(getattr(template, method).versions, reverse=True))}]"""
-        for arg in getattr(template, method).optional_arguments:
-            h += f"\n    - {arg}"
+        for arg, default in getattr(template, method).optional_arguments.items():
+            h += f"\n    - {arg} [default: {default}]"
     return h
 
 
