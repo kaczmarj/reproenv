@@ -12,6 +12,7 @@ binaries:
     yum:
     - curl
   instructions: |
+    {{ self.install_dependencies() }}
     curl -fsSL --output /usr/local/bin/jq {{ self.urls[self.version]}}
     chmod +x /usr/local/bin/jq
   urls:
