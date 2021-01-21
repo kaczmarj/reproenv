@@ -37,32 +37,37 @@ def _render_string_from_template(
     # TODO: we could use a while loop or recursive function to render the template until
     # there are no jinja-specific things. At this point, we support one level of
     # nesting.
-    source = source.replace("self.", "template.")
-    tmpl = _jinja_env.from_string(source)
+    n_renders = 0
+    max_renders = 20
+
     err = (
         "A template included in this renderer raised an error. Please check the"
         " template definition. A required argument might not be included in the"
         " required arguments part of the template. Variables in the template should"
         " start with `self.`."
     )
-    try:
-        first_pass = tmpl.render(template=template)
-    except jinja2.exceptions.UndefinedError as e:
-        raise RendererError(err) from e
-
-    if (
-        _jinja_env.variable_start_string not in first_pass
-        and _jinja_env.variable_end_string not in first_pass
-    ):
-        return first_pass
 
     # Render the string again. This is sometimes necessary because some defaults in the
     # template are rendered as {{ self.X }}. These defaults need to be rendered again.
-    try:
-        first_pass = first_pass.replace("self.", "template.")
-        return _jinja_env.from_string(first_pass).render(template=template)
-    except jinja2.exceptions.UndefinedError:
-        raise TemplateError(err)
+
+    while (
+        _jinja_env.variable_start_string in source
+        and _jinja_env.variable_end_string in source
+    ):
+        source = source.replace("self.", "template.")
+        tmpl = _jinja_env.from_string(source)
+        try:
+            source = tmpl.render(template=template)
+        except jinja2.exceptions.UndefinedError as e:
+            raise RendererError(err) from e
+        n_renders += 1
+
+        if n_renders > max_renders:
+            raise RendererError(
+                f"reached maximum rendering iterations ({max_renders}). Templates"
+                f" should not nest variables more than {max_renders} times."
+            )
+    return source
 
 
 class _Renderer:
