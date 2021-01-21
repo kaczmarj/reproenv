@@ -188,6 +188,24 @@ class _Renderer:
 
         # Patch the `template_method.install_dependencies` instance method so it can be
         # used (ie rendered) in a template and have access to the pkg_manager requested.
+        def install_patch(
+            inner_self: _BaseInstallationTemplate, pkgs: ty.List[str], opts: str = None
+        ) -> str:
+            return _install(pkgs=pkgs, pkg_manager=self.pkg_manager)
+
+        # mypy complains when we try to patch a class, so we do it behind its back with
+        # setattr. See https://github.com/python/mypy/issues/2427
+        setattr(
+            template_method,
+            "install",
+            types.MethodType(install_patch, template_method),
+        )
+
+        # Set pkg_manager onto the template.
+        setattr(template_method, "pkg_manager", self.pkg_manager)
+
+        # Patch the `template_method.install_dependencies` instance method so it can be
+        # used (ie rendered) in a template and have access to the pkg_manager requested.
         def install_dependencies_patch(
             inner_self: _BaseInstallationTemplate, opts: str = None
         ) -> str:

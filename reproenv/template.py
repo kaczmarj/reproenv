@@ -105,6 +105,10 @@ class _BaseInstallationTemplate:
                 kwds[key] = str(value)
         self._kwds = kwds
 
+        # This is meant to be overwritten by renderers, so that self.pkg_manager can
+        # be used in templates.
+        self.pkg_manager = None
+
         # We cannot validate kwds immediately... The Renderer should not validate
         # immediately. It should validate only the installation method being used.
         self._set_kwds_as_attrs()
@@ -200,9 +204,15 @@ class _BaseInstallationTemplate:
         # TODO: not sure why the following line raises a type error in mypy.
         return deps_dict.get(pkg_manager, [])  # type: ignore
 
+    def install(self, pkgs: ty.List[str], opts: str = None) -> str:
+        raise NotImplementedError(
+            "This method is meant to be patched by renderer objects, so it can be used"
+            " in templates and have access to the pkg_manager being used."
+        )
+
     def install_dependencies(self, opts: str = None) -> str:
         raise NotImplementedError(
-            "this method is meant to be patched by renderer objects, so it can be used"
+            "This method is meant to be patched by renderer objects, so it can be used"
             " in templates and have access to the pkg_manager being used."
         )
 
