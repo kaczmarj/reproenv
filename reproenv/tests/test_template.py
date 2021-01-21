@@ -12,15 +12,15 @@ def test_template():
             "urls": {"v1": "foo"},
             "env": {"baz": "cat", "boo": "123"},
             "instructions": "echo hi there\n{{ self.baz }}",
-            "arguments": {"required": ["baz"], "optional": []},
+            "arguments": {"required": ["baz"], "optional": {}},
             "dependencies": {"apt": ["curl"], "debs": ["foo"], "yum": ["curl"]},
         },
         "source": {
             "env": {"foo": "bar"},
-            "instructions": "echo foo\n{{ self.boo | default('baz') }}",
+            "instructions": "echo foo\n{{ self.boo }}",
             "arguments": {
                 "required": [],
-                "optional": ["boo"],
+                "optional": {"boo": "baz"},
             },
             "dependencies": {"apt": ["curl"], "debs": [], "yum": []},
         },
@@ -48,11 +48,15 @@ def test_template():
         template.Template(
             d, binaries_kwds={}, source_kwds=dict(boop="cat")
         ).source.validate_kwds()
-
     # provide all kwds
     t = template.Template(d, binaries_kwds=dict(baz=1234), source_kwds=dict(boo="cat"))
+    t.binaries.validate_kwds()
+    t.source.validate_kwds()
     # do not provide optional kwds
     t = template.Template(d, binaries_kwds=dict(baz=1234))
+    t.binaries.validate_kwds()
+    t.source.validate_kwds()
+    assert t.source.boo == d["source"]["arguments"]["optional"]["boo"]
 
     assert t.name == d["name"]
     assert t.binaries._template == d["binaries"]
@@ -67,7 +71,7 @@ def test_template():
                 "urls": {"v1": "foo"},
                 "env": {"baz": "cat", "boo": "123"},
                 "instructions": "echo hi there\n{{ self.baz }}",
-                "arguments": {"required": ["baz"], "optional": []},
+                "arguments": {"required": ["baz"], "optional": {}},
                 "dependencies": {"apt": ["curl"], "debs": ["foo"], "yum": ["curl"]},
             },
         },
@@ -81,10 +85,10 @@ def test_template():
             "name": "foobar",
             "source": {
                 "env": {"foo": "bar"},
-                "instructions": "echo foo\n{{ self.boo | default('baz') }}",
+                "instructions": "echo foo\n{{ self.boo }}",
                 "arguments": {
                     "required": [],
-                    "optional": ["boo"],
+                    "optional": {"boo": "baz"},
                 },
                 "dependencies": {"apt": ["curl"], "debs": [], "yum": []},
             },
@@ -100,10 +104,10 @@ def test_template():
             {
                 "source": {
                     "env": {"foo": "bar"},
-                    "instructions": "echo foo\n{{ self.boo | default('baz') }}",
+                    "instructions": "echo foo\n{{ self.boo }}",
                     "arguments": {
                         "required": [],
-                        "optional": ["boo"],
+                        "optional": {"boo": "baz"},
                     },
                     "dependencies": {"apt": ["curl"], "dpkg": [], "yum": []},
                 },
@@ -124,14 +128,14 @@ def test_installation_template_base():
     assert it.instructions == d["instructions"]
     assert it.arguments == {}
     assert it.required_arguments == set()
-    assert it.optional_arguments == set()
+    assert it.optional_arguments == {}
     assert it.dependencies("apt") == []
     assert it.dependencies("foobar") == []
 
     d: types.BinariesTemplateType = {
         "urls": {"1.0.0": "foobar"},
         "instructions": "hello {{ self.name }}",
-        "arguments": {"required": ["name"], "optional": ["age"]},
+        "arguments": {"required": ["name"], "optional": {"age": "50"}},
     }
 
     #
@@ -169,17 +173,17 @@ def test_installation_template_base():
     #
     d: types.SourceTemplateType = {
         "instructions": "hello {{ self.name }}",
-        "arguments": {"required": ["name"], "optional": ["age"]},
+        "arguments": {"required": ["name"], "optional": {"age": "52"}},
     }
     it = template._SourceTemplate(d, name="foobar")
     assert it.versions == {"ANY"}
 
     d: types.SourceTemplateType = {
         "env": {"foo": "bar", "cat": "dog"},
-        "instructions": "echo {{ name }}\n{{ self.install_dependencies() }}",
+        "instructions": "echo {{ name }}",
         "arguments": {
             "required": ["name"],
-            "optional": ["age", "height"],
+            "optional": {"age": "24", "height": "100 m"},
         },
         "dependencies": {"apt": ["curl"], "dpkg": [], "yum": ["python"]},
     }
@@ -189,7 +193,7 @@ def test_installation_template_base():
     assert it.instructions == d["instructions"]
     assert it.arguments == d["arguments"]
     assert it.required_arguments == set(d["arguments"]["required"])
-    assert it.optional_arguments == set(d["arguments"]["optional"])
+    assert it.optional_arguments == d["arguments"]["optional"]
     assert it.dependencies("apt") == d["dependencies"]["apt"]
     # TODO: add dpkg
     assert it.dependencies("yum") == d["dependencies"]["yum"]

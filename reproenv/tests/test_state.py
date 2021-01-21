@@ -246,7 +246,7 @@ def test_validate_template_valid_templates():
                 "urls": {"v1": "foo"},
                 "env": {"baz": "cat", "boo": "123"},
                 "instructions": "echo hi there\n{{ self.install_dependencies() }}",
-                "arguments": {"required": [], "optional": []},
+                "arguments": {"required": [], "optional": {}},
                 "dependencies": {"apt": ["curl"], "debs": ["foo"], "yum": ["curl"]},
             },
             "source": {
@@ -254,7 +254,7 @@ def test_validate_template_valid_templates():
                 "instructions": "echo foo\n{{ self.install_dependencies() }}",
                 "arguments": {
                     "required": [],
-                    "optional": [],
+                    "optional": {},
                 },
                 "dependencies": {"apt": ["curl"], "debs": [], "yum": []},
             },
@@ -273,7 +273,7 @@ def test_register(tmp_path: Path):
             "instructions": "foobar",
             "arguments": {
                 "required": [],
-                "optional": [],
+                "optional": {},
             },
             "dependencies": {"apt": [], "debs": [], "yum": []},
         },
@@ -282,7 +282,7 @@ def test_register(tmp_path: Path):
             "instructions": "foobar",
             "arguments": {
                 "required": [],
-                "optional": [],
+                "optional": {},
             },
             "dependencies": {"apt": [], "debs": [], "yum": []},
         },

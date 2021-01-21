@@ -16,7 +16,7 @@ def test_docker_renderer_add_template():
             "instructions": "echo hello\necho world",
             "arguments": {
                 "required": [],
-                "optional": [],
+                "optional": {},
             },
             "dependencies": {"apt": ["curl"], "debs": [], "yum": ["python"]},
         },
@@ -72,7 +72,7 @@ def test_docker_renderer_add_template():
             "instructions": "echo hello {{ self.name }}",
             "arguments": {
                 "required": ["name"],
-                "optional": [],
+                "optional": {},
             },
             "dependencies": {"apt": ["curl"], "debs": [], "yum": ["python"]},
         },
@@ -94,10 +94,10 @@ RUN apt-get update -qq \\
         "binaries": {
             "urls": {"1.0.0": "foobar"},
             "env": {"foo": "bar"},
-            "instructions": "echo hello {{ self.name | default('foo') }}",
+            "instructions": "echo hello {{ self.name }}",
             "arguments": {
                 "required": [],
-                "optional": ["name"],
+                "optional": {"name": "foo"},
             },
             "dependencies": {"apt": ["curl"], "debs": [], "yum": ["python"]},
         },

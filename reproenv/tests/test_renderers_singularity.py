@@ -16,7 +16,7 @@ def test_singularity_renderer_add_template():
             "instructions": "echo hello {{ self.myname }}",
             "arguments": {
                 "required": ["myname"],
-                "optional": [],
+                "optional": {},
             },
             "dependencies": {"apt": ["curl wget"], "debs": [], "yum": ["python wget"]},
         },
@@ -57,10 +57,10 @@ echo hello Bjork"""
         "binaries": {
             "urls": {"1.0.0": "foobar"},
             "env": {"foo": "bar"},
-            "instructions": "echo hello {{ self.myname | default('foo') }}",
+            "instructions": "echo hello {{ self.myname }}",
             "arguments": {
                 "required": [],
-                "optional": ["myname"],
+                "optional": {"myname": "foo"},
             },
             "dependencies": {"apt": ["curl wget"], "debs": [], "yum": ["python wget"]},
         },

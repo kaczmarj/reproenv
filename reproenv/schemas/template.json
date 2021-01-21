@@ -81,10 +81,16 @@
           }
         },
         "optional": {
-          "type": "array",
-          "items": {
+          "type": "object",
+          "additionalProperties": {
             "type": "string"
-          }
+          },
+          "examples": [
+            {
+              "optional_kwd": "default value",
+              "another_optional": "another default value"
+            }
+          ]
         }
       },
       "additionalProperties": false

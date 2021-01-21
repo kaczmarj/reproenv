@@ -20,6 +20,9 @@ class Template:
     for an argument `version`, this class can be used to hold both the template and the
     value for `version`.
 
+    Keywords are not validated during initialization. To validate keywords, use the
+    instance method `self.binaries.validate_kwds()` and`self.source.validate_kwds()`.
+
     Parameters
     ----------
     template : TemplateType
@@ -122,14 +125,13 @@ class _BaseInstallationTemplate:
                 )
             )
 
-        # Check that unknown kwargs weren't passed.
-        unknown_kwargs = set(self._kwds).difference(
-            self.required_arguments.union(self.optional_arguments)
-        )
-        if unknown_kwargs:
+        # Check that unknown kwargs were not provided.
+        all_kwds = self.required_arguments.union(self.optional_arguments.keys())
+        unknown_kwds = set(self._kwds).difference(all_kwds)
+        if unknown_kwds:
             raise TemplateKeywordArgumentError(
                 "Keyword argument provided is not specified in template: '{}'.".format(
-                    "', '".join(unknown_kwargs)
+                    "', '".join(unknown_kwds)
                 )
             )
         # Check that version is valid.
@@ -154,6 +156,12 @@ class _BaseInstallationTemplate:
                 " template, then the template must be modified to use different"
                 " keywords.".format("', '".join(shadowed))
             )
+        # Set optional arguments to their default value, if the argument was not
+        # provided.
+        for k, v in self.optional_arguments.items():
+            self._kwds.setdefault(k, v)
+        # Set keywords as attributes to this object. This makes it easy to render
+        # variables in the jinja template.
         for k, v in self._kwds.items():
             setattr(self, k, v)
 
@@ -179,9 +187,9 @@ class _BaseInstallationTemplate:
         return set(args) if args is not None else set()
 
     @property
-    def optional_arguments(self) -> ty.Set[str]:
+    def optional_arguments(self) -> ty.Dict[str, str]:
         args = self.arguments.get("optional", None)
-        return set(args) if args is not None else set()
+        return args if args is not None else {}
 
     @property
     def versions(self) -> ty.Set[str]:

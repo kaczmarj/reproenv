@@ -29,7 +29,7 @@ class _TemplateArgumentsType(TypedDict):
     """Arguments (i.e., variables) that are used in the template."""
 
     required: ty.List[str]
-    optional: ty.List[str]
+    optional: ty.Mapping[str, str]
 
 
 class _BaseTemplateType(TypedDict, total=False):
