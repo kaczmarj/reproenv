@@ -74,6 +74,13 @@ class Template:
     def source(self) -> ty.Union[None, _SourceTemplate]:
         return self._source
 
+    @property
+    def alert(self) -> str:
+        """Return the template's `alert` property. Return an empty string if it does
+        not exist.
+        """
+        return self._template.get("alert", "")
+
 
 class _BaseInstallationTemplate:
     """Base class for installation template classes.

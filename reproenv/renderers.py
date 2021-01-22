@@ -170,6 +170,10 @@ class _Renderer:
         # invalid.
         template_method.validate_kwds()
 
+        # TODO: print a message if the template has a nonempty `alert` property.
+        # If we print to stdout, however, we can cause problems if the user is piping
+        # the output to a file or directly to a container build command.
+
         # If we keep the `self.VAR` syntax of the template, then we need to pass
         # `self=template_method` to the renderer function. But that function is an
         # instance method, so passing `self` will override the `self` argument.

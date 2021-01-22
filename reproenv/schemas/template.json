@@ -21,6 +21,12 @@
     "name": {
       "type": "string"
     },
+    "alert": {
+      "type": "string",
+      "examples": [
+        "This software includes non-free licenses. Please refer to the respective licenses for more information."
+      ]
+    },
     "binaries": {
       "type": "object",
       "required": [

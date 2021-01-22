@@ -69,7 +69,7 @@ class _TemplateRegistry:
         cls,
         path_or_template: ty.Union[str, os.PathLike, TemplateType],
         name: str = None,
-    ):
+    ) -> TemplateType:
         """Register a template. This will overwrite an existing template with the
         same name in the registry.
 
@@ -129,6 +129,7 @@ class _TemplateRegistry:
         # Add template to registry.
         # TODO: should we log a message if overwriting a key-value pair?
         cls._templates[name.lower()] = template
+        return template
 
     @classmethod
     def get(cls, name: str) -> TemplateType:
@@ -163,4 +164,5 @@ class _TemplateRegistry:
 
 register_template = _TemplateRegistry.register
 registered_templates = _TemplateRegistry.keys
+registered_templates_items = _TemplateRegistry.items
 get_template = _TemplateRegistry.get

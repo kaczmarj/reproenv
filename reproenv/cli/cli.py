@@ -13,7 +13,10 @@ import click
 from reproenv import __version__
 from reproenv.renderers import DockerRenderer
 from reproenv.renderers import SingularityRenderer
-from reproenv.state import _TemplateRegistry
+from reproenv.state import get_template
+from reproenv.state import register_template
+from reproenv.state import registered_templates
+from reproenv.state import registered_templates_items
 from reproenv.template import Template
 from reproenv.types import allowed_pkg_managers
 
@@ -54,7 +57,7 @@ class GroupAddCommonParamsAndRegisteredTemplates(click.Group):
                 yamls.extend(path.glob(pattern))
         # TODO: log warning if no yamls are found?
         for path in yamls:
-            _TemplateRegistry.register(path)
+            _ = register_template(path)
 
         params: ty.List[click.Parameter] = [
             click.Option(
@@ -237,7 +240,7 @@ def _get_common_renderer_params() -> ty.List[click.Parameter]:
     return params
 
 
-def _create_help_for_template(template):
+def _create_help_for_template(template: Template):
     methods = []
     if template.binaries is not None:
         methods.append("binaries")
@@ -254,13 +257,17 @@ def _create_help_for_template(template):
                     sorted(getattr(template, method).versions, reverse=True))}]"""
         for arg, default in getattr(template, method).optional_arguments.items():
             h += f"\n    - {arg} [default: {default}]"
+    if template.alert:
+        h += f"\n**Note**: {template.alert}"
     return h
 
 
 def _get_params_for_registered_templates() -> ty.List[click.Parameter]:
     """Return list of click parameters for registered templates."""
     params: ty.List[click.Parameter] = []
-    for name, tmpl in _TemplateRegistry.items():
+    names_tmpls = list(registered_templates_items())
+    names_tmpls.sort(key=lambda r: r[0])  # sort by name
+    for name, tmpl in names_tmpls:
         hlp = _create_help_for_template(Template(tmpl))
         param = OptionEatAll(
             [f"--{name.lower()}"],
@@ -345,9 +352,16 @@ def _get_instruction_for_param(
         d = {"name": param.name, "kwds": {"path": value}}
     # probably a registered template?
     else:
-        if param.name.lower() in _TemplateRegistry.keys():
+        if param.name.lower() in registered_templates():
+            tmpl_name = param.name.lower()
             value = dict(value)
-            d = {"name": param.name.lower(), "kwds": dict(value)}
+            d = {"name": tmpl_name, "kwds": dict(value)}
+            # If the template has an alert, prompt the user for confirmation.
+            tmpl = Template(get_template(tmpl_name))
+            if tmpl.alert:
+                # TODO: add color to this to make it visible, perhaps yellow. But there
+                # is no color option in `click.confirm`.
+                click.confirm(f"{tmpl.alert} Do you understand?", abort=True, err=True)
         else:
             # TODO: should we do anything special with unknown options? Probably log it.
             pass

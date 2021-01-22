@@ -202,3 +202,17 @@ def test_installation_template_base():
     assert it.name == "foobar"
     assert it.age == "42"
     assert it.height == "100"
+
+
+def test_template_alert():
+    d: types.TemplateType = {
+        "alert": "This is an alert!",
+        "name": "testing",
+        "binaries": {"urls": {"foo": "foo.baz.tar.gz"}, "instructions": "do nothing"},
+    }
+    tmpl = template.Template(d)
+    assert tmpl.alert == d["alert"]
+
+    del d["alert"]
+    tmpl = template.Template(d)
+    assert tmpl.alert == ""

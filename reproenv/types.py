@@ -61,6 +61,7 @@ class TemplateType(TypedDict, total=False):
     name: str
     binaries: _BinariesTemplateType
     source: _SourceTemplateType
+    alert: str
 
 
 class _SingularityHeaderType(TypedDict, total=False):
